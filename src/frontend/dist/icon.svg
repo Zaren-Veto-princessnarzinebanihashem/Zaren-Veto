@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Dark background for PWA icon -->
+  <rect width="200" height="200" fill="#0d0f1a" rx="36"/>
+
+  <!-- Classic heraldic shield: wide top, curved sides, pointed bottom -->
+  <path
+    d="M38 42 L100 18 L162 42 L162 100 C162 144 134 172 100 185 C66 172 38 144 38 100 Z"
+    fill="#4169E1"
+  />
+
+  <!-- Bold white Z letter: top bar, diagonal, bottom bar -->
+  <path
+    d="M67 72 L133 72 L133 86 L91 122 L133 122 L133 136 L67 136 L67 122 L109 86 L67 86 Z"
+    fill="#ffffff"
+  />
+</svg>

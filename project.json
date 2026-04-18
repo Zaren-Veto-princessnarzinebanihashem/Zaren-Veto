@@ -1,0 +1,29 @@
+{
+  "overview": "Zaren Veto is a premium, privacy-focused social networking application built on the Internet Computer. It delivers full Facebook-equivalent features including Stories, Explore with hashtags, friend requests, advanced post privacy, admin dashboard, polls, pinned posts, and real-time messaging enhancements — all with end-to-end encryption, dark mode, and multilingual support (Arabic, French, English).",
+  "features": [
+    "Stories with 24-hour expiry and viewer tracking",
+    "Explore page with trending hashtags and search",
+    "Advanced post privacy (Public/Friends/Followers/Custom)",
+    "Friend requests with accept/decline/block flow",
+    "Profile About section (bio, location, work, education, website)",
+    "Owner-only Admin Dashboard for verification and moderation",
+    "Pinned posts on profiles",
+    "Polls in posts with real-time vote results",
+    "Message reactions and read receipts",
+    "Verification badge exclusive to owner (Princess Narzine Bani Hashem)",
+    "PWA support for mobile installation",
+    "Arabic/French/English with full RTL support"
+  ],
+  "category": "social",
+  "tags": [
+    "social-network",
+    "privacy",
+    "internet-computer",
+    "pwa",
+    "dark-mode",
+    "arabic",
+    "stories",
+    "messaging"
+  ],
+  "last_updated": "2026-04-15T18:57:07.290Z"
+}

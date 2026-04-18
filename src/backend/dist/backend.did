@@ -1,0 +1,310 @@
+type Visibility = 
+ variant {
+   customList;
+   everyone;
+   followersOnly;
+   friendsOnly;
+ };
+type UserProfile = 
+ record {
+   aboutBio: opt text;
+   aboutEducation: opt text;
+   aboutLocation: opt text;
+   aboutWebsite: opt text;
+   aboutWork: opt text;
+   bio: text;
+   birthdate: opt text;
+   coverPhotoUrl: opt text;
+   followerCount: nat;
+   followingCount: nat;
+   id: UserId;
+   isOfficialPage: bool;
+   isVerified: bool;
+   postCount: nat;
+   profilePhotoUrl: opt text;
+   username: text;
+   visibility: Visibility;
+ };
+type UserId = principal;
+type Timestamp = int;
+type StoryView = 
+ record {
+   author: UserProfile;
+   createdAt: Timestamp;
+   expiresAt: Timestamp;
+   id: StoryId;
+   imageUrl: text;
+   textOverlay: opt text;
+   viewCount: nat;
+   viewedByMe: bool;
+ };
+type StoryId = nat;
+type StoryFeed = 
+ record {
+   author: UserProfile;
+   hasUnviewed: bool;
+   stories: vec StoryView;
+ };
+type SearchResults = 
+ record {
+   posts: vec PostView;
+   users: vec UserProfile;
+ };
+type RespondAction = 
+ variant {
+   accept;
+   block;
+   decline;
+ };
+type ResolveAction = 
+ variant {
+   banUser;
+   deleteContent;
+   dismiss;
+   suspendUser;
+ };
+type ReportView = 
+ record {
+   createdAt: Timestamp;
+   id: nat;
+   reason: text;
+   reportedPost: opt PostView;
+   reportedUser: opt UserProfile;
+   reporter: UserProfile;
+   status: text;
+ };
+type ReactionType = 
+ variant {
+   angry;
+   haha;
+   like;
+   love;
+   sad;
+   wow;
+ };
+type PostView = 
+ record {
+   authorId: UserId;
+   authorName: text;
+   authorProfilePhoto: opt text;
+   authorVerified: bool;
+   content: text;
+   createdAt: Timestamp;
+   id: PostId;
+   imageUrl: opt text;
+   isPinned: bool;
+   updatedAt: Timestamp;
+   visibility: Visibility;
+ };
+type PostStats = 
+ record {
+   comments: nat;
+   likes: nat;
+   shares: nat;
+ };
+type PostId = nat;
+type PollResults = 
+ record {
+   myVote: opt nat;
+   options: vec PollOptionResult;
+   totalVotes: nat;
+ };
+type PollOptionResult = 
+ record {
+   id: nat;
+   percent: float64;
+   "text": text;
+   votes: nat;
+ };
+type NotificationView = 
+ record {
+   actorId: UserId;
+   actorName: text;
+   createdAt: Timestamp;
+   id: NotificationId;
+   isRead: bool;
+   notifType: NotificationType;
+ };
+type NotificationType = 
+ variant {
+   comment: record {
+              commentId: CommentId;
+              postId: PostId;
+            };
+   follow: record {};
+   friendRequest: record {requestId: nat;};
+   like: record {postId: PostId;};
+   mention: record {postId: PostId;};
+   reaction: record {
+               postId: PostId;
+               reaction: ReactionType;
+             };
+   share: record {postId: PostId;};
+   verified: record {};
+ };
+type NotificationId = nat;
+type MessageView = 
+ record {
+   conversationId: ConversationId;
+   createdAt: Timestamp;
+   encryptedContent: blob;
+   id: MessageId;
+   isRead: bool;
+   readAt: opt Timestamp;
+   senderId: UserId;
+ };
+type MessageReactionView = 
+ record {
+   reaction: text;
+   reactor: UserProfile;
+ };
+type MessageId = nat;
+type HashtagStat = 
+ record {
+   hashtag: text;
+   postCount: nat;
+ };
+type FriendRequestView = 
+ record {
+   createdAt: Timestamp;
+   from: UserProfile;
+   id: FriendRequestId;
+   status: text;
+   to: UserProfile;
+ };
+type FriendRequestId = nat;
+type ConversationSummary = 
+ record {
+   conversationId: ConversationId;
+   lastMessageAt: Timestamp;
+   lastMessagePreview: text;
+   otherUserId: UserId;
+   otherUsername: text;
+ };
+type ConversationId = text;
+type CommentView = 
+ record {
+   authorId: UserId;
+   authorName: text;
+   content: text;
+   createdAt: Timestamp;
+   id: CommentId;
+   parentId: opt CommentId;
+   postId: PostId;
+   replyCount: nat;
+   updatedAt: Timestamp;
+ };
+type CommentId = nat;
+type AdminStats = 
+ record {
+   pendingReports: nat;
+   totalMessages: nat;
+   totalPosts: nat;
+   totalStories: nat;
+   totalUsers: nat;
+   verifiedUsers: nat;
+ };
+service : {
+  addComment: (postId: PostId, "text": text) -> (CommentId);
+  banUser: (userId: UserId) -> (bool);
+  blockUser: (userId: UserId) -> ();
+  cancelFriendRequest: (requestId: nat) -> (bool);
+  createOfficialPost: (content: text, imageUrl: opt text) ->
+   (variant {
+      err: text;
+      ok: PostId;
+    });
+  createPoll: (postId: PostId, question: text, options: vec text) -> (nat);
+  createPost: (content: text, visibility: Visibility, customAllowList:
+   vec UserId, imageUrl: opt text) -> (variant {
+                                         err: text;
+                                         ok: PostId;
+                                       });
+  createStory: (imageUrl: text, textOverlay: opt text) -> (StoryView);
+  deleteComment: (commentId: CommentId) -> ();
+  deletePost: (postId: PostId) -> (bool);
+  deleteStory: (storyId: nat) -> ();
+  editComment: (commentId: CommentId, "text": text) -> ();
+  editPost: (postId: PostId, content: text) -> (bool);
+  followUser: (target: UserId) -> (bool);
+  getAdminStats: () -> (AdminStats) query;
+  getAllUsers: (page: nat, pageSize: nat) -> (vec UserProfile) query;
+  getComments: (postId: PostId) -> (vec CommentView) query;
+  getConversations: () -> (vec ConversationSummary) query;
+  getFeed: () -> (vec PostView) query;
+  getFriendRequestStatus: (userId: UserId) -> (text) query;
+  getHashtagPosts: (hashtag: text) -> (vec PostView) query;
+  getLikes: (postId: PostId) -> (vec UserId) query;
+  getMessageReactions: (messageId: MessageId) ->
+   (vec MessageReactionView) query;
+  getMessages: (otherUser: UserId) -> (vec MessageView) query;
+  getMyProfile: () -> (opt UserProfile) query;
+  getMyReaction: (postId: PostId) -> (opt ReactionType);
+  getMyStories: () -> (vec StoryView) query;
+  getNotifications: () -> (vec NotificationView);
+  getOfficialPage: () -> (UserProfile) query;
+  getOfficialPagePosts: (page: nat, pageSize: nat) -> (vec PostView) query;
+  getPendingRequests: () -> (vec FriendRequestView) query;
+  getPollResults: (pollId: nat) -> (PollResults) query;
+  getPostStats: (postId: PostId) -> (PostStats) query;
+  getReactions: (postId: PostId) -> (vec record {
+                                           ReactionType;
+                                           nat;
+                                         }) query;
+  getReports: (page: nat, pageSize: nat) -> (vec ReportView) query;
+  getSavedPosts: () -> (vec PostView);
+  getSentRequests: () -> (vec FriendRequestView) query;
+  getShares: (postId: PostId) -> (nat) query;
+  getStoriesFeed: () -> (vec StoryFeed) query;
+  getStoryViewers: (storyId: nat) -> (vec UserProfile) query;
+  getTrendingHashtags: () -> (vec HashtagStat) query;
+  getUnreadCount: () -> (nat);
+  getUserPosts: (userId: UserId) -> (vec PostView) query;
+  getUserProfile: (userId: UserId) -> (opt UserProfile) query;
+  grantVerification: (userId: UserId) -> (bool);
+  hasLiked: (postId: PostId) -> (bool);
+  isBlocked: (userId: UserId) -> (bool) query;
+  isFollowing: (target: UserId) -> (bool) query;
+  isVerified: (userId: UserId) -> (bool) query;
+  likePost: (postId: PostId) -> ();
+  markMessageRead: (messageId: MessageId) -> ();
+  markNotificationsRead: () -> ();
+  pinPost: (postId: PostId) -> (bool);
+  reactToMessage: (messageId: MessageId, reaction: ReactionType) -> (bool);
+  reactToPost: (postId: PostId, reaction: ReactionType) -> ();
+  register: (username: text, bio: text) -> (bool);
+  registerWithPassword: (username: text, password: text, bio: text) ->
+   (variant {
+      err: text;
+      ok: bool;
+    });
+  removeMessageReaction: (messageId: MessageId) -> (bool);
+  removeReaction: (postId: PostId) -> ();
+  replyToComment: (parentCommentId: CommentId, "text": text) -> (CommentId);
+  reportPost: (postId: PostId, reason: text) -> ();
+  reportUser: (userId: UserId, reason: text) -> ();
+  resolveReport: (reportId: nat, action: ResolveAction) -> (bool);
+  respondFriendRequest: (requestId: nat, action: RespondAction) -> (bool);
+  revokeVerification: (userId: UserId) -> (bool);
+  savePost: (postId: PostId) -> ();
+  searchContent: (searchQuery: text) -> (SearchResults) query;
+  searchUsers: (term: text) -> (vec UserProfile) query;
+  sendFriendRequest: (to: UserId) -> (bool);
+  sendMessage: (recipient: UserId, encryptedContent: blob) -> (MessageId);
+  sharePost: (postId: PostId) -> ();
+  suspendUser: (userId: UserId, durationHours: nat) -> (bool);
+  unblockUser: (userId: UserId) -> ();
+  unfollowUser: (target: UserId) -> (bool);
+  unlikePost: (postId: PostId) -> ();
+  unpinPost: () -> (bool);
+  unsavePost: (postId: PostId) -> ();
+  unsharePost: (postId: PostId) -> ();
+  updateAbout: (bio: opt text, location: opt text, work: opt text, education:
+   opt text, website: opt text) -> (bool);
+  updateCoverPhoto: (imageUrl: text) -> ();
+  updateProfile: (username: text, bio: text, visibility: Visibility) ->
+   (bool);
+  updateProfilePhoto: (imageUrl: text) -> ();
+  viewStory: (storyId: nat) -> ();
+  votePoll: (pollId: nat, optionId: nat) -> (bool);
+}

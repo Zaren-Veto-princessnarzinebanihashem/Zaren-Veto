@@ -208,15 +208,18 @@ export interface _SERVICE {
   'getLikes' : ActorMethod<[PostId], Array<UserId>>,
   'getMessageReactions' : ActorMethod<[MessageId], Array<MessageReactionView>>,
   'getMessages' : ActorMethod<[UserId], Array<MessageView>>,
+  'getMyEmail' : ActorMethod<[], [] | [string]>,
   'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getMyReaction' : ActorMethod<[PostId], [] | [ReactionType]>,
   'getMyStories' : ActorMethod<[], Array<StoryView>>,
   'getNotifications' : ActorMethod<[], Array<NotificationView>>,
   'getOfficialPage' : ActorMethod<[], UserProfile>,
+  'getOfficialPageLink' : ActorMethod<[], string>,
   'getOfficialPagePosts' : ActorMethod<[bigint, bigint], Array<PostView>>,
   'getPendingRequests' : ActorMethod<[], Array<FriendRequestView>>,
   'getPollResults' : ActorMethod<[bigint], PollResults>,
   'getPostStats' : ActorMethod<[PostId], PostStats>,
+  'getProfileLink' : ActorMethod<[UserId], string>,
   'getReactions' : ActorMethod<[PostId], Array<[ReactionType, bigint]>>,
   'getReports' : ActorMethod<[bigint, bigint], Array<ReportView>>,
   'getSavedPosts' : ActorMethod<[], Array<PostView>>,
@@ -234,6 +237,11 @@ export interface _SERVICE {
   'isFollowing' : ActorMethod<[UserId], boolean>,
   'isVerified' : ActorMethod<[UserId], boolean>,
   'likePost' : ActorMethod<[PostId], undefined>,
+  'loginWithPassword' : ActorMethod<
+    [string, string],
+    { 'ok' : UserProfile } |
+      { 'err' : string }
+  >,
   'markMessageRead' : ActorMethod<[MessageId], undefined>,
   'markNotificationsRead' : ActorMethod<[], undefined>,
   'pinPost' : ActorMethod<[PostId], boolean>,
@@ -241,7 +249,7 @@ export interface _SERVICE {
   'reactToPost' : ActorMethod<[PostId, ReactionType], undefined>,
   'register' : ActorMethod<[string, string], boolean>,
   'registerWithPassword' : ActorMethod<
-    [string, string, string],
+    [string, string, string, [] | [string]],
     { 'ok' : boolean } |
       { 'err' : string }
   >,
@@ -270,9 +278,28 @@ export interface _SERVICE {
     [[] | [string], [] | [string], [] | [string], [] | [string], [] | [string]],
     boolean
   >,
-  'updateCoverPhoto' : ActorMethod<[string], undefined>,
+  'updateCoverPhoto' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'updateEmail' : ActorMethod<[string], boolean>,
+  'updateOfficialPageCoverPhoto' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'updateOfficialPageProfilePhoto' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'updateProfile' : ActorMethod<[string, string, Visibility], boolean>,
-  'updateProfilePhoto' : ActorMethod<[string], undefined>,
+  'updateProfilePhoto' : ActorMethod<
+    [string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'viewStory' : ActorMethod<[bigint], undefined>,
   'votePoll' : ActorMethod<[bigint, bigint], boolean>,
 }

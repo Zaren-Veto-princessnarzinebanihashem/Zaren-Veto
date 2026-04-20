@@ -114,11 +114,19 @@ function useCreatePost() {
     }) => {
       if (!actor) throw new Error("Not connected");
       const result = await actor.createPost(content, visibility, [], null);
-      if (result.__kind__ === "err") throw new Error(result.err);
+      if (!result || result.__kind__ === "err") {
+        throw new Error(
+          result && "err" in result ? result.err : t.failedToPublishPost,
+        );
+      }
       const postId = result.ok;
       // If poll provided, create it attached to post
       if (pollQuestion && pollOptions && pollOptions.length >= 2) {
-        await actor.createPoll(postId, pollQuestion, pollOptions);
+        try {
+          await actor.createPoll(postId, pollQuestion, pollOptions);
+        } catch {
+          // Poll creation failing shouldn't block the post
+        }
       }
       return postId;
     },
@@ -126,7 +134,10 @@ function useCreatePost() {
       void qc.invalidateQueries({ queryKey: ["feed"] });
       toast.success(t.postPublished);
     },
-    onError: () => toast.error(t.failedToPublishPost),
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : t.failedToPublishPost;
+      toast.error(msg);
+    },
   });
 }
 
@@ -140,13 +151,18 @@ function useEditPost() {
       content,
     }: { postId: PostId; content: string }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.editPost(postId, content);
+      const result = await actor.editPost(postId, content);
+      if (result === false) throw new Error(t.failedToUpdatePost);
+      return result;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["feed"] });
       toast.success(t.postUpdated);
     },
-    onError: () => toast.error(t.failedToUpdatePost),
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : t.failedToUpdatePost;
+      toast.error(msg);
+    },
   });
 }
 
@@ -503,22 +519,27 @@ function CreatePostForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEmpty || isOverLimit) return;
+    if (isEmpty || isOverLimit || createPost.isPending) return;
     const hasPoll =
       showPollEditor &&
       pollQuestion.trim() &&
       pollOptions.filter((o) => o.value.trim()).length >= 2;
-    await createPost.mutateAsync({
-      content: content.trim(),
-      visibility,
-      pollQuestion: hasPoll ? pollQuestion.trim() : undefined,
-      pollOptions: hasPoll
-        ? pollOptions.filter((o) => o.value.trim()).map((o) => o.value.trim())
-        : undefined,
-    });
-    setContent("");
-    setExpanded(false);
-    removePollEditor();
+    try {
+      await createPost.mutateAsync({
+        content: content.trim(),
+        visibility,
+        pollQuestion: hasPoll ? pollQuestion.trim() : undefined,
+        pollOptions: hasPoll
+          ? pollOptions.filter((o) => o.value.trim()).map((o) => o.value.trim())
+          : undefined,
+      });
+      // Only clear form on success
+      setContent("");
+      setExpanded(false);
+      removePollEditor();
+    } catch {
+      // Error is handled by onError in useMutation — do not clear form
+    }
   };
 
   return (
@@ -771,6 +792,7 @@ function CommentSection({
 }: { postId: bigint; postIdStr: string }) {
   const { t, isRTL: isRtl } = useLanguage();
   const [commentText, setCommentText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { actor, isFetching } = useAuthenticatedBackend();
   const qc = useQueryClient();
 
@@ -785,11 +807,21 @@ function CommentSection({
   });
 
   const handleAddComment = async () => {
-    if (!commentText.trim() || !actor) return;
-    await actor.addComment(postId, commentText.trim());
-    void qc.invalidateQueries({ queryKey: ["comments", postId.toString()] });
-    toast.success(t.postComment);
-    setCommentText("");
+    const text = commentText.trim();
+    if (!text || !actor || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await actor.addComment(postId, text);
+      void qc.invalidateQueries({ queryKey: ["comments", postId.toString()] });
+      void qc.invalidateQueries({ queryKey: ["feed"] });
+      toast.success(t.postComment);
+      setCommentText("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t.failedToPublishPost;
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -809,6 +841,7 @@ function CommentSection({
             placeholder={t.addComment}
             className="h-10 sm:h-8 text-sm sm:text-xs bg-secondary border-input flex-1"
             data-ocid={`comment-input-${postIdStr}`}
+            disabled={isSubmitting}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -820,10 +853,14 @@ function CommentSection({
             size="sm"
             className="h-8 px-3 shrink-0"
             onClick={() => void handleAddComment()}
-            disabled={!commentText.trim()}
+            disabled={!commentText.trim() || isSubmitting}
             data-ocid={`comment-send-${postIdStr}`}
           >
-            <Send className="w-3 h-3" />
+            {isSubmitting ? (
+              <span className="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+            ) : (
+              <Send className="w-3 h-3" />
+            )}
           </Button>
         </div>
       </div>
@@ -1177,9 +1214,10 @@ function PostCard({
   const qc = useQueryClient();
 
   const postIdStr = post.id.toString();
-  const isOwner = currentUserId === post.authorId.toString();
+  const isOwner =
+    currentUserId !== undefined && currentUserId === post.authorId.toString();
   const isEdited = post.updatedAt > post.createdAt;
-  const isVerified = isVerifiedUser(post.authorName);
+  const isVerified = isVerifiedUser(post.authorName ?? "");
 
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
@@ -1205,13 +1243,35 @@ function PostCard({
   };
 
   const handleLike = () => {
+    if (!actor) return;
+    // Optimistic update
+    const wasLiked = isLiked;
     setIsLiked((v) => !v);
-    setLikeCount((c) => (isLiked ? c - 1 : c + 1));
+    setLikeCount((c) => (wasLiked ? Math.max(0, c - 1) : c + 1));
+    // Backend call — fire and forget, revert on error
+    const call = wasLiked ? actor.unlikePost(post.id) : actor.likePost(post.id);
+    call.catch(() => {
+      setIsLiked(wasLiked);
+      setLikeCount((c) => (wasLiked ? c + 1 : Math.max(0, c - 1)));
+      toast.error(t.failedToPublishPost);
+    });
   };
 
   const handleReact = (type: ReactionType) => {
-    setCurrentReaction((prev) => (prev === type ? null : type));
+    if (!actor) return;
+    const prev = currentReaction;
+    const next = prev === type ? null : type;
+    setCurrentReaction(next);
     setShowReactionPicker(false);
+    // Backend call — fire and forget
+    const call =
+      next === null
+        ? actor.removeReaction(post.id)
+        : actor.reactToPost(post.id, type);
+    call.catch(() => {
+      setCurrentReaction(prev);
+      toast.error(t.failedToPublishPost);
+    });
   };
 
   const handleSave = () => {
@@ -1745,7 +1805,7 @@ export default function FeedPage() {
     );
   if (status === "unauthenticated") return null;
 
-  const currentUserId = profile?.id.toString();
+  const currentUserId = profile?.id?.toString();
   const visiblePosts = (posts ?? []).slice(0, visibleCount);
   const hasMore = (posts?.length ?? 0) > visibleCount;
 

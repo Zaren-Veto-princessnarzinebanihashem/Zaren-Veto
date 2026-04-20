@@ -17,12 +17,17 @@ module {
     var visibility : Visibility; // controls post visibility default
     var profilePhotoUrl : ?Text;
     var coverPhotoUrl   : ?Text;
+    // Official page images — completely independent from personal profile images
+    var officialPageProfilePhotoUrl : ?Text;
+    var officialPageCoverPhotoUrl   : ?Text;
     var isVerified      : Bool;
     var isSuspended     : Bool;
     var suspendedUntil  : ?Common.Timestamp;
     var isBanned        : Bool;
     // Password-based registration (optional; Internet Identity users have null)
     var passwordHash    : ?Text;
+    // Optional email (for future verification features)
+    var email           : ?Text;
     // About section
     var aboutBio        : ?Text;
     var aboutLocation   : ?Text;

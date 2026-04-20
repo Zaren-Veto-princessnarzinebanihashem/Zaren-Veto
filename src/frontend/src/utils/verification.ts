@@ -1,14 +1,18 @@
 /**
  * Shared verification utility for Zaren Veto.
  *
- * The blue verification badge (Facebook/Instagram style) is owner-only by default.
- * Only the backend can set isVerified=true on other accounts.
+ * The blue verification badge (Facebook/Instagram/Meta style - spiked 12-ray circle)
+ * is owner-only by default. Only the backend can set isVerified=true on other accounts.
  * The owner account "Princess Narzine Bani Hashem" is always verified,
  * regardless of backend flag.
  */
 
 /** The canonical owner/admin username */
 export const ADMIN_USERNAME = "Princess Narzine Bani Hashem";
+
+/** The two blue profile lines shown exclusively on the owner's profile — no duplicates, no extra words */
+export const OWNER_PROFILE_LINE1 = "Personnalité Publique";
+export const OWNER_PROFILE_LINE2 = "Fondatrice de l'application Zaren Veto";
 
 /**
  * Normalize a username for loose matching:
@@ -25,10 +29,6 @@ function normalizeUsername(name: string): string {
  * 1. `isVerifiedFromBackend === true`  (backend explicitly granted verification)
  * 2. Username matches the owner "Princess Narzine Bani Hashem"
  *    (case-insensitive, ignoring spaces/underscores/hyphens)
- *
- * This dual check ensures the owner always has the badge even if the backend
- * isVerified field hasn't been set yet, and other users can get it once the
- * owner grants it via the backend.
  */
 export function isVerifiedUser(
   username: string,
@@ -37,10 +37,20 @@ export function isVerifiedUser(
   if (isVerifiedFromBackend === true) return true;
   if (!username) return false;
   const normalized = normalizeUsername(username);
-  // Match owner: "Princess Narzine Bani Hashem" in any casing/spacing form
   return (
     normalized === "princessnarzinebanihashem" ||
     normalized === "princessnarzine" ||
     normalized === "narzinebanihashem"
   );
+}
+
+/**
+ * Returns true if this is the app owner's profile
+ * (same logic as isVerifiedUser but exposed separately for clarity).
+ */
+export function isOwnerProfile(
+  username: string,
+  isVerifiedFromBackend?: boolean,
+): boolean {
+  return isVerifiedUser(username, isVerifiedFromBackend);
 }

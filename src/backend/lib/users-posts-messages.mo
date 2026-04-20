@@ -5,8 +5,103 @@ import Set "mo:core/Set";
 import List "mo:core/List";
 import Principal "mo:core/Principal";
 import Text "mo:core/Text";
+import Nat32 "mo:core/Nat32";
+import Char "mo:core/Char";
 
 module {
+  // ─── Password hashing ─────────────────────────────────────────────────────
+
+  /// Deterministic password hash using a multi-round XOR+rotate-left mixing.
+  /// Produces a 32-char hex string. Same input always → same output.
+  /// Stored hash is NEVER the plain text password.
+  public func hashPassword(password : Text) : Text {
+    let chars = password.toArray();
+    let n = chars.size();
+    var h0 : Nat32 = 0x6b43a9b5;
+    var h1 : Nat32 = 0x52f3d17c;
+    var h2 : Nat32 = 0x9e1c4a3d;
+    var h3 : Nat32 = 0xd78b2f61;
+    var round : Nat = 0;
+    while (round < 4) {
+      var i : Nat = 0;
+      while (i < n) {
+        let cv : Nat32 = chars[i].toNat32();
+        let idx = i % 4;
+        if (idx == 0) {
+          h0 := (h0 ^ cv) <<> 7;
+          h0 := h0 +% h1;
+        } else if (idx == 1) {
+          h1 := (h1 ^ cv) <<> 13;
+          h1 := h1 +% h2;
+        } else if (idx == 2) {
+          h2 := (h2 ^ cv) <<> 17;
+          h2 := h2 +% h3;
+        } else {
+          h3 := (h3 ^ cv) <<> 19;
+          h3 := h3 +% h0;
+        };
+        i += 1;
+      };
+      h0 := h0 ^ (h1 <<> 11);
+      h1 := h1 ^ (h2 <<> 23);
+      h2 := h2 ^ (h3 <<> 5);
+      h3 := h3 ^ (h0 <<> 29);
+      round += 1;
+    };
+    nat32ToHex(h0) # nat32ToHex(h1) # nat32ToHex(h2) # nat32ToHex(h3);
+  };
+
+  private func nat32ToHex(v : Nat32) : Text {
+    let digits = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'];
+    var result = "";
+    var remaining = v;
+    var i : Nat = 0;
+    while (i < 8) {
+      let nibble = (remaining >> 28).toNat();
+      result := result # Text.fromChar(digits[nibble]);
+      remaining := remaining << 4;
+      i += 1;
+    };
+    result;
+  };
+
+  // ─── Owner name protection ────────────────────────────────────────────────
+
+  /// Normalise a username for comparison: lowercase, remove spaces/hyphens/underscores/dots.
+  public func normalizeUsername(name : Text) : Text {
+    let lower = name.toLower();
+    var result = "";
+    for (c in lower.toIter()) {
+      if (c != ' ' and c != '-' and c != '_' and c != '.') {
+        result := result # Text.fromChar(c);
+      };
+    };
+    result;
+  };
+
+  /// Returns true if the requested username matches any reserved owner name variant.
+  /// Protected names (case-insensitive, spaces/punctuation stripped):
+  ///   "Princess Narzine Bani Hashem", "Narzine Bani Hashem", "Princess Narzine",
+  ///   "Zaren Veto" (the app itself)
+  public func isReservedName(username : Text) : Bool {
+    let norm = normalizeUsername(username);
+    // Exact match against protected canonical forms
+    let protected = [
+      "princessnarzinebanihashem",
+      "princessnarzine",
+      "narzinebanihashem",
+      "narzinebani",
+      "zarenveto",
+    ];
+    for (p in protected.values()) {
+      if (norm == p) return true;
+    };
+    // Block any name containing the owner's core identifier
+    if (norm.contains(#text "narzinebani")) return true;
+    if (norm.contains(#text "princessnarzine")) return true;
+    false;
+  };
+
   // ─── User helpers ──────────────────────────────────────────────────────────
 
   /// Validate a password against Facebook-style rules:
@@ -33,11 +128,14 @@ module {
       var visibility      = #everyone;
       var profilePhotoUrl = null;
       var coverPhotoUrl   = null;
+      var officialPageProfilePhotoUrl = null;
+      var officialPageCoverPhotoUrl   = null;
       var isVerified      = (username == "Princess Narzine Bani Hashem");
       var isSuspended     = false;
       var suspendedUntil  = null;
       var isBanned        = false;
       var passwordHash    = null;
+      var email           = null;
       var aboutBio        = null;
       var aboutLocation   = null;
       var aboutWork       = null;
@@ -47,8 +145,15 @@ module {
     };
   };
 
-  /// Create a new User record with a password hash (password-based flow).
-  public func newUserWithPassword(id : Common.UserId, username : Text, password : Text, bio : Text) : Types.User {
+  /// Create a new User record with a hashed password (password-based flow).
+  /// The plain-text password is NEVER stored — only its hash.
+  public func newUserWithPassword(
+    id       : Common.UserId,
+    username : Text,
+    password : Text,
+    bio      : Text,
+    email    : ?Text,
+  ) : Types.User {
     {
       id;
       var username;
@@ -56,11 +161,14 @@ module {
       var visibility      = #everyone;
       var profilePhotoUrl = null;
       var coverPhotoUrl   = null;
+      var officialPageProfilePhotoUrl = null;
+      var officialPageCoverPhotoUrl   = null;
       var isVerified      = (username == "Princess Narzine Bani Hashem");
       var isSuspended     = false;
       var suspendedUntil  = null;
       var isBanned        = false;
-      var passwordHash    = ?("PWD:" # password);
+      var passwordHash    = ?(hashPassword(password));
+      var email;
       var aboutBio        = null;
       var aboutLocation   = null;
       var aboutWork       = null;
@@ -80,10 +188,14 @@ module {
     let postCount = posts.filter(func(p : Types.Post) : Bool { p.authorId == user.id }).size();
     // Owner account always shows 19k followers
     let followerCount = if (user.username == "Princess Narzine Bani Hashem") 19000 else followers.size();
+    // Owner profile bio lines
+    let displayBio = if (user.username == "Princess Narzine Bani Hashem")
+      "Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto"
+    else user.bio;
     {
       id             = user.id;
       username       = user.username;
-      bio            = user.bio;
+      bio            = displayBio;
       visibility     = user.visibility;
       postCount;
       followerCount;
@@ -92,7 +204,7 @@ module {
       coverPhotoUrl   = user.coverPhotoUrl;
       isVerified      = user.isVerified;
       isOfficialPage  = false;
-      aboutBio        = user.aboutBio;
+      aboutBio        = if (user.username == "Princess Narzine Bani Hashem") ?"Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto" else user.aboutBio;
       aboutLocation   = user.aboutLocation;
       aboutWork       = user.aboutWork;
       aboutEducation  = user.aboutEducation;

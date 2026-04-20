@@ -66,6 +66,8 @@ mixin (
     switch (users.get(caller)) {
       case (?_) { false }; // already registered
       case null {
+        // Block reserved owner name variants
+        if (Lib.isReservedName(username)) return false;
         let user = Lib.newUser(caller, username, bio);
         // Auto-verify the owner account
         if (username == "Princess Narzine Bani Hashem") {
@@ -81,15 +83,20 @@ mixin (
   /// Register with a password (Facebook-style). Password must be ≥8 chars,
   /// contain at least one uppercase letter, one lowercase letter, and one digit.
   /// Returns: #ok(true) on success, #err(message) on validation failure or duplicate.
-  public shared ({ caller }) func registerWithPassword(username : Text, password : Text, bio : Text) : async { #ok : Bool; #err : Text } {
+  /// email is optional — stored for future verification features.
+  public shared ({ caller }) func registerWithPassword(username : Text, password : Text, bio : Text, email : ?Text) : async { #ok : Bool; #err : Text } {
     if (caller.isAnonymous()) return #err("Anonymous callers cannot register");
     switch (users.get(caller)) {
       case (?_) { #err("Already registered") };
       case null {
+        // Block reserved owner name variants
+        if (Lib.isReservedName(username)) {
+          return #err("This username is reserved and cannot be used.");
+        };
         if (not Lib.validatePassword(password)) {
           return #err("Password must be at least 8 characters and contain at least one uppercase letter, one lowercase letter, and one digit");
         };
-        let user = Lib.newUserWithPassword(caller, username, password, bio);
+        let user = Lib.newUserWithPassword(caller, username, password, bio, email);
         if (username == "Princess Narzine Bani Hashem") {
           verified.add(caller);
           user.isVerified := true;
@@ -112,6 +119,80 @@ mixin (
           verified.add(caller);
           user.isVerified := true;
         };
+        true;
+      };
+    };
+  };
+
+  /// Secure login with username and password.
+  /// Finds the user by username, hashes the submitted password, compares to stored hash.
+  /// Returns the user profile on success, or an error on failure.
+  /// NOTE: Because Internet Computer query calls cannot verify identity, this is an
+  /// update call — the caller's principal is used only as a session hint; the real
+  /// authentication is the password comparison.
+  public shared func loginWithPassword(username : Text, password : Text) : async { #ok : Types.UserProfile; #err : Text } {
+    // Find user by username
+    var foundUser : ?Types.User = null;
+    for ((_, user) in users.entries()) {
+      if (user.username == username) {
+        foundUser := ?user;
+      };
+    };
+    switch (foundUser) {
+      case null { #err("Invalid username or password") };
+      case (?user) {
+        switch (user.passwordHash) {
+          case null {
+            // User registered via Internet Identity — no password set
+            #err("This account uses Internet Identity login and does not have a password");
+          };
+          case (?storedHash) {
+            let submittedHash = Lib.hashPassword(password);
+            if (submittedHash == storedHash) {
+              // Build a minimal profile for the response
+              let followerCount : Nat = if (user.username == "Princess Narzine Bani Hashem") 19000 else 0;
+              #ok({
+                id             = user.id;
+                username       = user.username;
+                bio            = user.bio;
+                visibility     = user.visibility;
+                postCount      = 0;
+                followerCount;
+                followingCount = 0;
+                profilePhotoUrl = user.profilePhotoUrl;
+                coverPhotoUrl   = user.coverPhotoUrl;
+                isVerified      = user.isVerified;
+                isOfficialPage  = false;
+                aboutBio        = user.aboutBio;
+                aboutLocation   = user.aboutLocation;
+                aboutWork       = user.aboutWork;
+                aboutEducation  = user.aboutEducation;
+                aboutWebsite    = user.aboutWebsite;
+                birthdate       = user.birthdate;
+              });
+            } else {
+              #err("Invalid username or password");
+            };
+          };
+        };
+      };
+    };
+  };
+
+  /// Return the calling user's email address (if set).
+  public shared query ({ caller }) func getMyEmail() : async ?Text {
+    switch (users.get(caller)) {
+      case null null;
+      case (?user) user.email;
+    };
+  };
+
+  /// Update the calling user's email address.
+  public shared ({ caller }) func updateEmail(email : Text) : async Bool {
+    switch (users.get(caller)) {
+      case null false;
+      case (?user) {
+        user.email := ?email;
         true;
       };
     };
@@ -171,21 +252,22 @@ mixin (
   /// Return the official Zaren Veto app page profile.
   /// Returns the owner's profile (Princess Narzine Bani Hashem) with isOfficialPage=true.
   public query func getOfficialPage() : async Types.UserProfile {
+    let officialBio = "Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto";
     switch (findOwner()) {
       case (?owner) {
         {
           id              = owner.id;
           username        = "Zaren Veto";
-          bio             = "Page officielle de la fondatrice de l'application Zaren Veto";
+          bio             = officialBio;
           visibility      = #everyone;
           postCount       = officialPagePosts.size();
           followerCount   = 19000;
           followingCount  = 0;
-          profilePhotoUrl = owner.profilePhotoUrl;
-          coverPhotoUrl   = owner.coverPhotoUrl;
+          profilePhotoUrl = owner.officialPageProfilePhotoUrl;
+          coverPhotoUrl   = owner.officialPageCoverPhotoUrl;
           isVerified      = true;
           isOfficialPage  = true;
-          aboutBio        = ?"Zaren Veto est un réseau social premium axé sur la confidentialité.";
+          aboutBio        = ?officialBio;
           aboutLocation   = null;
           aboutWork       = null;
           aboutEducation  = null;
@@ -198,7 +280,7 @@ mixin (
         {
           id              = Principal.anonymous();
           username        = "Zaren Veto";
-          bio             = "Page officielle de la fondatrice de l'application Zaren Veto";
+          bio             = officialBio;
           visibility      = #everyone;
           postCount       = officialPagePosts.size();
           followerCount   = 19000;
@@ -207,7 +289,7 @@ mixin (
           coverPhotoUrl   = null;
           isVerified      = true;
           isOfficialPage  = true;
-          aboutBio        = ?"Zaren Veto est un réseau social premium axé sur la confidentialité.";
+          aboutBio        = ?officialBio;
           aboutLocation   = null;
           aboutWork       = null;
           aboutEducation  = null;
@@ -242,13 +324,22 @@ mixin (
     let sorted = officialPagePosts.sort(func(a : Types.Post, b : Types.Post) : { #less; #equal; #greater } {
       Int.compare(b.createdAt, a.createdAt);
     });
-    let total   = sorted.size();
-    let startIdx : Int = (page * pageSize).toInt();
-    let endIdx   : Int = ((page + 1) * pageSize).toInt();
-    let from : Int = if (startIdx < total.toInt()) startIdx else total.toInt();
-    let to   : Int = if (endIdx   < total.toInt()) endIdx   else total.toInt();
-    let slice = sorted.sliceToArray(from, to);
-    slice.map<Types.Post, Types.PostView>(func(p) { toView(p) });
+    let total  = sorted.size();
+    let start  = page * pageSize;
+    if (start >= total) return [];
+    let stop = if (start + pageSize > total) total else start + pageSize;
+    sorted.sliceToArray(start, stop).map<Types.Post, Types.PostView>(func(p) { toView(p) });
+  };
+
+  /// Return a shareable profile link identifier for the given userId.
+  /// Returns the principal text as a profile path token.
+  public query func getProfileLink(userId : Common.UserId) : async Text {
+    "profile/" # userId.toText();
+  };
+
+  /// Return a shareable link identifier for the official Zaren Veto page.
+  public query func getOfficialPageLink() : async Text {
+    "page/zaren-veto";
   };
 
   // ─── Follow ───────────────────────────────────────────────────────────────

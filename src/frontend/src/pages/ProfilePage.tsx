@@ -11,9 +11,13 @@ import { useAuthenticatedBackend } from "@/hooks/useAuthenticatedBackend";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { useLanguage } from "@/i18n/LanguageContext";
-import type { PostView, UserProfile } from "@/types";
+import type { CommentView, PostView, UserProfile } from "@/types";
 import { ReactionType, Visibility } from "@/types";
-import { isVerifiedUser } from "@/utils/verification";
+import {
+  OWNER_PROFILE_LINE1,
+  OWNER_PROFILE_LINE2,
+  isVerifiedUser,
+} from "@/utils/verification";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
@@ -23,19 +27,21 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Copy,
   Edit3,
   ExternalLink,
   FileText,
   Globe,
   GraduationCap,
   Heart,
+  ImagePlus,
   Link2,
   Lock,
   MapPin,
   MessageSquare,
   Pin,
+  Send,
   Share2,
+  Trash2,
   UserMinus,
   UserPlus,
   Users,
@@ -57,61 +63,95 @@ const REACTIONS: Array<{ type: ReactionType; emoji: string }> = [
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
-function useUserProfile(userId: string) {
+function useUserProfile(userId: string | undefined) {
   const { actor, isFetching } = useAuthenticatedBackend();
   return useQuery<UserProfile | null>({
-    queryKey: ["userProfile", userId],
+    queryKey: ["userProfile", userId ?? ""],
     queryFn: async () => {
-      if (!actor) return null;
-      const { Principal } = await import("@icp-sdk/core/principal");
-      return actor.getUserProfile(Principal.fromText(userId));
+      if (!actor || !userId) return null;
+      try {
+        const { Principal } = await import("@icp-sdk/core/principal");
+        const result = await actor.getUserProfile(Principal.fromText(userId));
+        return result ?? null;
+      } catch {
+        return null;
+      }
     },
     enabled: !!actor && !isFetching && !!userId,
     retry: false,
   });
 }
 
-function useUserPosts(userId: string) {
+function useUserPosts(userId: string | undefined) {
   const { actor, isFetching } = useAuthenticatedBackend();
   return useQuery<PostView[]>({
-    queryKey: ["userPosts", userId],
+    queryKey: ["userPosts", userId ?? ""],
     queryFn: async () => {
-      if (!actor) return [];
-      const { Principal } = await import("@icp-sdk/core/principal");
-      return actor.getUserPosts(Principal.fromText(userId));
+      if (!actor || !userId) return [];
+      try {
+        const { Principal } = await import("@icp-sdk/core/principal");
+        return (await actor.getUserPosts(Principal.fromText(userId))) ?? [];
+      } catch {
+        return [];
+      }
     },
     enabled: !!actor && !isFetching && !!userId,
     retry: false,
   });
 }
 
-function useIsFollowing(userId: string) {
+function useIsFollowing(userId: string | undefined) {
   const { actor, isFetching } = useAuthenticatedBackend();
   return useQuery<boolean>({
-    queryKey: ["isFollowing", userId],
+    queryKey: ["isFollowing", userId ?? ""],
     queryFn: async () => {
-      if (!actor) return false;
-      const { Principal } = await import("@icp-sdk/core/principal");
-      return actor.isFollowing(Principal.fromText(userId));
+      if (!actor || !userId) return false;
+      try {
+        const { Principal } = await import("@icp-sdk/core/principal");
+        return (await actor.isFollowing(Principal.fromText(userId))) ?? false;
+      } catch {
+        return false;
+      }
     },
     enabled: !!actor && !isFetching && !!userId,
     retry: false,
   });
 }
 
-function useFriendRequestStatus(userId: string, enabled: boolean) {
+function useFriendRequestStatus(userId: string | undefined, enabled: boolean) {
   const { actor, isFetching } = useAuthenticatedBackend();
   return useQuery<string>({
-    queryKey: ["friendStatus", userId],
+    queryKey: ["friendStatus", userId ?? ""],
     queryFn: async () => {
-      if (!actor) return "none";
-      const { Principal } = await import("@icp-sdk/core/principal");
-      const result = await actor.getFriendRequestStatus(
-        Principal.fromText(userId),
-      );
-      return result ?? "none";
+      if (!actor || !userId) return "none";
+      try {
+        const { Principal } = await import("@icp-sdk/core/principal");
+        const result = await actor.getFriendRequestStatus(
+          Principal.fromText(userId),
+        );
+        return result ?? "none";
+      } catch {
+        return "none";
+      }
     },
     enabled: !!actor && !isFetching && !!userId && enabled,
+    retry: false,
+  });
+}
+
+function usePostComments(postId: bigint, enabled: boolean) {
+  const { actor, isFetching } = useAuthenticatedBackend();
+  return useQuery<CommentView[]>({
+    queryKey: ["postComments", postId.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      try {
+        return (await actor.getComments(postId)) ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!actor && !isFetching && enabled,
     retry: false,
   });
 }
@@ -153,7 +193,7 @@ function StatBlock({
       <span className="font-display text-xl font-semibold text-foreground">
         {display}
       </span>
-      <span className="text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+      <span className="text-xs text-muted-foreground tracking-wide whitespace-nowrap">
         {label}
       </span>
     </div>
@@ -197,6 +237,17 @@ function ShieldBadgeSVG({ size = 60 }: { size?: number }) {
   );
 }
 
+// ─── Upload progress indicator ────────────────────────────────────────────────
+
+function UploadProgressOverlay({ label }: { label: string }) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-inherit z-10">
+      <span className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin mb-2 block" />
+      <span className="text-white text-xs font-medium">{label}</span>
+    </div>
+  );
+}
+
 interface PhotoUploadButtonProps {
   onUpload: (file: File) => Promise<void>;
   uploading: boolean;
@@ -215,18 +266,25 @@ function PhotoUploadButton({
   className = "",
 }: PhotoUploadButtonProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await onUpload(file);
-    if (fileRef.current) fileRef.current.value = "";
+    try {
+      await onUpload(file);
+    } catch {
+      // error toast is shown by the caller
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
   };
+
   return (
     <>
       <input
         ref={fileRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/*"
         className="sr-only"
         onChange={(e) => void handleChange(e)}
         disabled={uploading}
@@ -509,8 +567,16 @@ function ProfileHero({
   const initials = profile.username.slice(0, 2).toUpperCase();
   const displayFollowers = followerCount ?? profile.followerCount;
 
+  // Safe profile ID — null-checked to prevent routing errors
+  const profileId = profile.id != null ? profile.id.toString() : null;
+
   const handleCopyProfileLink = () => {
-    const url = `${window.location.origin}/profile/${profile.id.toString()}`;
+    if (!profileId) {
+      toast.error("Profile link not available");
+      return;
+    }
+    const url = `${window.location.origin}/profile/${encodeURIComponent(profileId)}`;
+
     const doFallback = () => {
       try {
         const el = document.createElement("textarea");
@@ -529,6 +595,7 @@ function ProfileHero({
         toast.error(t.actionFailed ?? "Copy failed");
       }
     };
+
     if (navigator.clipboard?.writeText) {
       navigator.clipboard
         .writeText(url)
@@ -565,7 +632,9 @@ function ProfileHero({
             </div>
           </div>
         )}
-        {isOwnProfile && (
+        {/* Upload progress overlay on cover */}
+        {uploadingCover && <UploadProgressOverlay label="Uploading…" />}
+        {isOwnProfile && !uploadingCover && (
           <div className="absolute bottom-3 right-3">
             <PhotoUploadButton
               onUpload={onCoverUpload}
@@ -592,7 +661,7 @@ function ProfileHero({
         >
           <div className="relative flex-shrink-0">
             <div
-              className="w-24 h-24 sm:w-[120px] sm:h-[120px] rounded-full border-4 border-background overflow-hidden shadow-md flex items-center justify-center"
+              className="w-24 h-24 sm:w-[120px] sm:h-[120px] rounded-full border-4 border-background overflow-hidden shadow-md flex items-center justify-center relative"
               style={{ backgroundColor: "#0d0f1a" }}
               data-ocid="profile.avatar"
             >
@@ -605,19 +674,25 @@ function ProfileHero({
               ) : (
                 <ShieldBadgeSVG size={72} />
               )}
+              {/* Upload progress overlay on avatar */}
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-full">
+                  <span className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin block" />
+                </div>
+              )}
             </div>
-            {isOwnProfile && (
+            {isOwnProfile && !uploadingAvatar && (
               <PhotoUploadButton
                 onUpload={onAvatarUpload}
                 uploading={uploadingAvatar}
                 label={t.changeProfilePhoto}
                 ocid="profile.avatar_upload_button"
-                className="absolute bottom-1 right-1 w-8 h-8 rounded-full flex items-center justify-center bg-black/75 hover:bg-black/90 border-2 border-background text-white shadow-md"
+                className="absolute bottom-1 right-1 w-8 h-8 rounded-full flex items-center justify-center bg-black/75 hover:bg-black/90 border-2 border-background text-white shadow-md z-10"
                 icon={<Camera className="w-4 h-4" />}
               />
             )}
             <div
-              className="absolute bottom-1 left-1 w-7 h-7 rounded-full flex items-center justify-center bg-background shadow-sm border border-border/40 pointer-events-none"
+              className="absolute bottom-1 left-1 w-7 h-7 rounded-full flex items-center justify-center bg-background shadow-sm border border-border/40 pointer-events-none z-10"
               aria-hidden="true"
             >
               <ShieldBadgeSVG size={18} />
@@ -626,6 +701,7 @@ function ProfileHero({
           <div className="pb-1 flex-shrink-0">{actionSlot}</div>
         </div>
 
+        {/* Name + verification badge */}
         <div className="mt-3 space-y-1">
           <div
             className={`flex items-center gap-2 flex-wrap ${isRTL ? "flex-row-reverse justify-end" : ""}`}
@@ -638,22 +714,35 @@ function ProfileHero({
             </h1>
             <VisibilityBadge visibility={profile.visibility} />
           </div>
-          {profile.bio && (
+
+          {/* User bio — only show if set AND NOT the owner (owner has the 2 fixed lines instead) */}
+          {profile.bio && !isVerified && (
             <p className="text-sm text-muted-foreground leading-relaxed max-w-lg break-words">
               {profile.bio}
             </p>
           )}
+
+          {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates, no gray/black text */}
           {isVerified && (
-            <div className="mt-1 space-y-0.5">
-              <p className="text-sm font-semibold" style={{ color: "#1877F2" }}>
-                Personnalité Publique
+            <div
+              className="mt-1 flex flex-col gap-0.5"
+              data-ocid="profile.owner_bio_lines"
+            >
+              <p
+                className="text-sm font-semibold leading-snug"
+                style={{ color: "#4169E1" }}
+              >
+                {OWNER_PROFILE_LINE1}
               </p>
-              <p className="text-sm font-medium" style={{ color: "#1877F2" }}>
-                Page officielle de la fondatrice de l&apos;application Zaren
-                Veto
+              <p
+                className="text-sm font-medium leading-snug"
+                style={{ color: "#4169E1" }}
+              >
+                {OWNER_PROFILE_LINE2}
               </p>
             </div>
           )}
+
           {showOfficialPageLink && (
             <button
               type="button"
@@ -662,11 +751,12 @@ function ProfileHero({
               data-ocid="profile.official_page_link"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Zaren Veto Official Page
+              Zaren Veto — Page officielle
             </button>
           )}
         </div>
 
+        {/* Stats row */}
         <div
           className={`flex items-center gap-4 sm:gap-8 mt-5 pt-4 border-t border-border/60 flex-wrap ${isRTL ? "flex-row-reverse" : ""}`}
         >
@@ -687,7 +777,8 @@ function ProfileHero({
         <button
           type="button"
           onClick={handleCopyProfileLink}
-          className={`mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-sm active:scale-[0.98] ${
+          disabled={!profileId}
+          className={`mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-sm active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
             linkCopied
               ? "bg-green-600 text-white border border-green-500/60"
               : "bg-[#4169E1] hover:bg-[#3457c8] text-white border border-[#4169E1]/80"
@@ -841,6 +932,119 @@ function EditProfileForm({
   );
 }
 
+// ─── Inline comment section ───────────────────────────────────────────────────
+
+function InlineComments({
+  postId,
+  index,
+}: {
+  postId: bigint;
+  index: number;
+}) {
+  const { actor } = useAuthenticatedBackend();
+  const queryClient = useQueryClient();
+  const { t } = useLanguage();
+  const [commentText, setCommentText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const { data: comments = [], isLoading } = usePostComments(postId, true);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = commentText.trim();
+    if (!text || submitting) return;
+    setSubmitting(true);
+    try {
+      if (!actor) throw new Error("Not authenticated");
+      await actor.addComment(postId, text);
+      await queryClient.invalidateQueries({
+        queryKey: ["postComments", postId.toString()],
+      });
+      setCommentText("");
+      toast.success(t.postComment);
+    } catch {
+      toast.error(t.actionFailed);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="px-4 py-3 border-t border-border/60 space-y-3"
+      data-ocid={`profile.comment_section.${index + 1}`}
+    >
+      {/* Comment input */}
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        className="flex gap-2 items-center"
+      >
+        <input
+          type="text"
+          value={commentText}
+          onChange={(e) => setCommentText(e.target.value)}
+          placeholder={t.addComment}
+          className="flex-1 text-sm bg-secondary rounded-full px-4 py-2 border border-input text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
+          disabled={submitting}
+          maxLength={500}
+          data-ocid={`profile.comment_input.${index + 1}`}
+        />
+        <button
+          type="submit"
+          disabled={!commentText.trim() || submitting}
+          className="w-8 h-8 rounded-full flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-40 transition-smooth hover:bg-primary/90"
+          aria-label={t.postComment}
+          data-ocid={`profile.comment_submit.${index + 1}`}
+        >
+          {submitting ? (
+            <span className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin block" />
+          ) : (
+            <Send className="w-3.5 h-3.5" />
+          )}
+        </button>
+      </form>
+
+      {/* Comment list */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2].map((k) => (
+            <div key={k} className="flex gap-2">
+              <Skeleton className="w-7 h-7 rounded-full shrink-0" />
+              <Skeleton className="h-7 flex-1 rounded-xl" />
+            </div>
+          ))}
+        </div>
+      ) : comments.length === 0 ? (
+        <p className="text-xs text-muted-foreground text-center py-1">
+          {t.noPostsYet === "No posts yet"
+            ? "No comments yet"
+            : "Aucun commentaire"}
+        </p>
+      ) : (
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {comments.map((c) => (
+            <div key={c.id.toString()} className="flex gap-2 items-start">
+              <div className="w-7 h-7 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
+                <span className="text-xs font-semibold text-primary">
+                  {c.authorName.slice(0, 1).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0 bg-secondary rounded-xl px-3 py-1.5">
+                <span className="text-xs font-semibold text-foreground mr-1.5">
+                  {c.authorName}
+                </span>
+                <span className="text-xs text-foreground/80 break-words">
+                  {c.content}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Posts Section ────────────────────────────────────────────────────────────
 
 function PostCard({
@@ -849,12 +1053,14 @@ function PostCard({
   isOwner,
   onPin,
   onUnpin,
+  onDelete,
 }: {
   post: PostView;
   index: number;
   isOwner: boolean;
   onPin?: (id: bigint) => void;
   onUnpin?: () => void;
+  onDelete?: (id: bigint) => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
@@ -888,10 +1094,11 @@ function PostCard({
   };
 
   const handleShare = () => {
-    void navigator.clipboard.writeText(
-      `${window.location.origin}/post/${post.id.toString()}`,
-    );
-    toast.success(t.linkCopied);
+    const postId = post.id != null ? post.id.toString() : "";
+    void navigator.clipboard
+      .writeText(`${window.location.origin}/post/${postId}`)
+      .then(() => toast.success(t.linkCopied))
+      .catch(() => toast.error(t.actionFailed));
   };
 
   return (
@@ -907,6 +1114,17 @@ function PostCard({
         <div className="flex items-center gap-1.5 text-xs text-amber-400 font-medium px-5 pt-4 pb-0">
           <Pin className="w-3.5 h-3.5" />
           {t.pinnedPost}
+        </div>
+      )}
+
+      {/* Post image */}
+      {post.imageUrl && (
+        <div className="border-b border-border/40">
+          <img
+            src={post.imageUrl}
+            alt="Contenu du post"
+            className="w-full object-cover max-h-72"
+          />
         </div>
       )}
 
@@ -932,7 +1150,7 @@ function PostCard({
                   <span className="font-bold leading-none">···</span>
                 </button>
                 {showMenu && (
-                  <div className="absolute top-8 right-0 bg-card border border-border rounded-xl shadow-xl z-20 w-40 overflow-hidden">
+                  <div className="absolute top-8 right-0 bg-card border border-border rounded-xl shadow-xl z-20 w-44 overflow-hidden">
                     {post.isPinned ? (
                       <button
                         type="button"
@@ -958,6 +1176,19 @@ function PostCard({
                         {t.pinPost}
                       </button>
                     )}
+                    {/* Delete option — red, destructive */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onDelete?.(post.id);
+                        setShowMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-smooth border-t border-border/60"
+                      data-ocid={`profile.post_delete.${index + 1}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      {t.deletePost}
+                    </button>
                   </div>
                 )}
               </div>
@@ -1046,12 +1277,8 @@ function PostCard({
         </button>
       </div>
 
-      {/* Inline comment placeholder */}
-      {showComments && (
-        <div className="px-5 py-3 border-t border-border/60 text-xs text-muted-foreground italic">
-          {t.addComment}
-        </div>
-      )}
+      {/* Full inline comments */}
+      {showComments && <InlineComments postId={post.id} index={index} />}
     </motion.div>
   );
 }
@@ -1062,12 +1289,14 @@ function PostsSection({
   isOwner,
   onPin,
   onUnpin,
+  onDelete,
 }: {
   posts: PostView[] | undefined;
   isLoading: boolean;
   isOwner: boolean;
   onPin: (id: bigint) => void;
   onUnpin: () => void;
+  onDelete: (id: bigint) => void;
 }) {
   const { t } = useLanguage();
 
@@ -1117,6 +1346,7 @@ function PostsSection({
           isOwner={isOwner}
           onPin={onPin}
           onUnpin={onUnpin}
+          onDelete={onDelete}
         />
       ))}
     </div>
@@ -1130,7 +1360,11 @@ function SavedPostsSection() {
     queryKey: ["savedPosts"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getSavedPosts();
+      try {
+        return (await actor.getSavedPosts()) ?? [];
+      } catch {
+        return [];
+      }
     },
     enabled: !!actor && !isFetching,
     retry: false,
@@ -1172,6 +1406,7 @@ function SavedPostsSection() {
           post={post}
           index={index}
           isOwner={false}
+          onDelete={() => {}}
         />
       ))}
     </div>
@@ -1220,8 +1455,11 @@ export default function ProfilePage() {
   const { actor } = useAuthenticatedBackend();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { userId } = useParams({ strict: false }) as { userId: string };
   const { t } = useLanguage();
+
+  // Safely extract userId — may be undefined if route param is missing
+  const params = useParams({ strict: false }) as { userId?: string };
+  const userId = params.userId ?? "";
 
   const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
@@ -1229,7 +1467,9 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [editing, setEditing] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
+  const [newPostImage, setNewPostImage] = useState<string | null>(null);
   const [publishingPost, setPublishingPost] = useState(false);
+  const postImageRef = useRef<HTMLInputElement>(null);
 
   const { uploadImage } = useImageUpload();
 
@@ -1240,19 +1480,27 @@ export default function ProfilePage() {
   const isOwnProfile =
     status === "authenticated" &&
     myProfile !== null &&
+    !!userId &&
     myProfile.id.toString() === userId;
 
   const {
     data: userProfile,
     isLoading: profileLoading,
     isError: profileError,
-  } = useUserProfile(userId);
-  const { data: posts, isLoading: postsLoading } = useUserPosts(userId);
-  const { data: isFollowingUser, isLoading: followLoading } = useIsFollowing(
-    isOwnProfile ? "" : userId,
-  );
-  const { data: friendStatus } = useFriendRequestStatus(userId, !isOwnProfile);
+  } = useUserProfile(userId || undefined);
 
+  const { data: posts, isLoading: postsLoading } = useUserPosts(
+    userId || undefined,
+  );
+  const { data: isFollowingUser, isLoading: followLoading } = useIsFollowing(
+    isOwnProfile ? undefined : userId || undefined,
+  );
+  const { data: friendStatus } = useFriendRequestStatus(
+    userId || undefined,
+    !isOwnProfile,
+  );
+
+  // Sync photo URLs from profile data
   useEffect(() => {
     if (userProfile?.coverPhotoUrl) setCoverPhotoUrl(userProfile.coverPhotoUrl);
     if (userProfile?.profilePhotoUrl)
@@ -1263,13 +1511,17 @@ export default function ProfilePage() {
     setUploadingAvatar(true);
     try {
       const persistentUrl = await uploadImage(file);
+      if (!actor) throw new Error("Not authenticated");
+      await actor.updateProfilePhoto(persistentUrl);
       setProfilePhotoUrl(persistentUrl);
-      if (actor) await actor.updateProfilePhoto(persistentUrl);
-      queryClient.invalidateQueries({ queryKey: ["myProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["userProfile", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["myProfile"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["userProfile", userId],
+      });
       toast.success(t.profilePhotoUpdated);
-    } catch {
-      toast.error(t.photoUploadFailed);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.photoUploadFailed;
+      toast.error(message);
     } finally {
       setUploadingAvatar(false);
     }
@@ -1279,15 +1531,35 @@ export default function ProfilePage() {
     setUploadingCover(true);
     try {
       const persistentUrl = await uploadImage(file);
+      if (!actor) throw new Error("Not authenticated");
+      await actor.updateCoverPhoto(persistentUrl);
       setCoverPhotoUrl(persistentUrl);
-      if (actor) await actor.updateCoverPhoto(persistentUrl);
-      queryClient.invalidateQueries({ queryKey: ["myProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["userProfile", userId] });
+      await queryClient.invalidateQueries({ queryKey: ["myProfile"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["userProfile", userId],
+      });
       toast.success(t.coverPhotoUpdated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : t.photoUploadFailed;
+      toast.error(message);
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  // Handle post image selection
+  const handlePostImageSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await uploadImage(file);
+      setNewPostImage(url);
     } catch {
       toast.error(t.photoUploadFailed);
     } finally {
-      setUploadingCover(false);
+      if (postImageRef.current) postImageRef.current.value = "";
     }
   };
 
@@ -1301,8 +1573,10 @@ export default function ProfilePage() {
       return actor.updateProfile(username, bio, visibility);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["myProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["userProfile", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["myProfile"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["userProfile", userId],
+      });
       setEditing(false);
       toast.success(t.profileUpdated);
     },
@@ -1311,13 +1585,17 @@ export default function ProfilePage() {
 
   const followMutation = useMutation({
     mutationFn: async () => {
-      if (!actor) throw new Error("Not authenticated");
+      if (!actor || !userId) throw new Error("Not authenticated");
       const { Principal } = await import("@icp-sdk/core/principal");
       return actor.followUser(Principal.fromText(userId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["isFollowing", userId] });
-      queryClient.invalidateQueries({ queryKey: ["userProfile", userId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["isFollowing", userId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["userProfile", userId],
+      });
       toast.success(t.follow);
     },
     onError: () => toast.error("Failed to follow user"),
@@ -1325,13 +1603,17 @@ export default function ProfilePage() {
 
   const unfollowMutation = useMutation({
     mutationFn: async () => {
-      if (!actor) throw new Error("Not authenticated");
+      if (!actor || !userId) throw new Error("Not authenticated");
       const { Principal } = await import("@icp-sdk/core/principal");
       return actor.unfollowUser(Principal.fromText(userId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["isFollowing", userId] });
-      queryClient.invalidateQueries({ queryKey: ["userProfile", userId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["isFollowing", userId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["userProfile", userId],
+      });
       toast.success(t.unfollow);
     },
     onError: () => toast.error("Failed to unfollow user"),
@@ -1339,12 +1621,14 @@ export default function ProfilePage() {
 
   const friendRequestMutation = useMutation({
     mutationFn: async () => {
-      if (!actor) throw new Error("Not authenticated");
+      if (!actor || !userId) throw new Error("Not authenticated");
       const { Principal } = await import("@icp-sdk/core/principal");
       return actor.sendFriendRequest(Principal.fromText(userId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["friendStatus", userId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["friendStatus", userId],
+      });
       toast.success(t.friendRequestSent);
     },
     onError: () => toast.error(t.actionFailed),
@@ -1360,14 +1644,21 @@ export default function ProfilePage() {
         content,
         Visibility.everyone,
         [],
-        null,
+        newPostImage ?? null,
       );
-      if (result.__kind__ === "err") throw new Error(result.err);
-      queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
+      if ("__kind__" in result && result.__kind__ === "err") {
+        throw new Error((result as { err: string }).err);
+      }
+      await queryClient.invalidateQueries({
+        queryKey: ["userPosts", userId],
+      });
       setNewPostContent("");
+      setNewPostImage(null);
       toast.success(t.postPublished);
-    } catch {
-      toast.error(t.failedToPublishPost);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : t.failedToPublishPost;
+      toast.error(message);
     } finally {
       setPublishingPost(false);
     }
@@ -1379,7 +1670,7 @@ export default function ProfilePage() {
       return actor.pinPost(postId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
       toast.success(t.postPinned);
     },
     onError: () => toast.error(t.actionFailed),
@@ -1391,12 +1682,26 @@ export default function ProfilePage() {
       return actor.unpinPost();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
       toast.success(t.postUnpinned);
     },
     onError: () => toast.error(t.actionFailed),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (postId: bigint) => {
+      if (!actor) throw new Error("Not authenticated");
+      return actor.deletePost(postId);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["userPosts", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["feed"] });
+      toast.success(t.postDeleted);
+    },
+    onError: () => toast.error(t.failedToDeletePost),
+  });
+
+  // ── Show loading while auth / profile data is initializing ──
   if (status === "initializing" || profileLoading) {
     return (
       <Layout>
@@ -1406,8 +1711,16 @@ export default function ProfilePage() {
       </Layout>
     );
   }
+
   if (status === "unauthenticated") return null;
-  if (profileError || userProfile === null || userProfile === undefined) {
+
+  // ── Show error if profile not found or ID is invalid ──
+  if (
+    !userId ||
+    profileError ||
+    userProfile === null ||
+    userProfile === undefined
+  ) {
     return (
       <Layout>
         <UserNotFound />
@@ -1416,14 +1729,13 @@ export default function ProfilePage() {
   }
 
   const isVerified = isVerifiedUser(
-    userProfile?.username ?? "",
-    userProfile?.isVerified,
+    userProfile.username ?? "",
+    userProfile.isVerified,
   );
   const followPending = followMutation.isPending || unfollowMutation.isPending;
 
-  // Friend request button label
   const getFriendButtonLabel = () => {
-    if (friendStatus === "accepted") return t.friends;
+    if (friendStatus === "accepted") return t.addFriend;
     if (friendStatus === "pending" || friendStatus === "sent")
       return t.pendingRequest;
     if (friendStatus === "blocked") return t.blocked;
@@ -1574,10 +1886,53 @@ export default function ProfilePage() {
                   className="bg-secondary border-input resize-none text-sm"
                   data-ocid="profile.create_post_input"
                 />
+
+                {/* Image preview */}
+                {newPostImage && (
+                  <div className="relative inline-block rounded-lg overflow-hidden border border-border/60">
+                    <img
+                      src={newPostImage}
+                      alt="Aperçu du post"
+                      className="max-h-40 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewPostImage(null)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition-smooth"
+                      aria-label="Remove image"
+                      data-ocid="profile.remove_post_image_button"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    {newPostContent.length}/500
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {newPostContent.length}/500
+                    </span>
+                    {/* Image picker button */}
+                    <>
+                      <input
+                        ref={postImageRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        className="sr-only"
+                        onChange={(e) => void handlePostImageSelect(e)}
+                        aria-label="Add image or video"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => postImageRef.current?.click()}
+                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-md hover:bg-secondary transition-smooth"
+                        title="Add image or video"
+                        data-ocid="profile.post_image_button"
+                      >
+                        <ImagePlus className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  </div>
                   <Button
                     size="sm"
                     disabled={!newPostContent.trim() || publishingPost}
@@ -1599,6 +1954,7 @@ export default function ProfilePage() {
               isOwner={isOwnProfile}
               onPin={(id) => pinMutation.mutate(id)}
               onUnpin={() => unpinMutation.mutate()}
+              onDelete={(id) => deleteMutation.mutate(id)}
             />
           </TabsContent>
           {isOwnProfile && (

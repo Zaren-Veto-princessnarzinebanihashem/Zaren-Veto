@@ -10,44 +10,123 @@ import { useState } from "react";
  *
  * Images are resized/compressed before encoding to keep the URL manageable.
  */
+
+export type UploadProgressState =
+  | "idle"
+  | "reading"
+  | "compressing"
+  | "done"
+  | "error";
+
 export function useImageUpload() {
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<UploadProgressState>("idle");
+  const [error, setError] = useState<string | null>(null);
 
   const uploadImage = async (file: File): Promise<string> => {
     setUploading(true);
+    setProgress("reading");
+    setError(null);
+
     try {
-      return await compressAndEncodeImage(file);
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Invalid file type. Please select an image.");
+      }
+
+      // Validate file size (max 10MB before compression)
+      const MAX_FILE_SIZE_MB = 10;
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        throw new Error(
+          `Image too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`,
+        );
+      }
+
+      setProgress("compressing");
+      const dataUrl = await compressAndEncodeImage(file);
+
+      // Check if the resulting base64 is reasonable size (< 500KB as string)
+      if (dataUrl.length > 500 * 1024) {
+        // Try with lower quality
+        const smallerUrl = await compressAndEncodeImage(file, 600, 0.7);
+        setProgress("done");
+        return smallerUrl;
+      }
+
+      setProgress("done");
+      return dataUrl;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
+      setProgress("error");
+      throw err instanceof Error ? err : new Error(message);
     } finally {
       setUploading(false);
     }
   };
 
-  return { uploadImage, uploading };
+  const reset = () => {
+    setUploading(false);
+    setProgress("idle");
+    setError(null);
+  };
+
+  return { uploadImage, uploading, progress, error, reset };
 }
 
 /**
- * Compress image to max 800px on largest side and encode as JPEG base64 data URL.
+ * Compress image to maxSize px on largest side and encode as JPEG base64 data URL.
  * Keeps file size reasonable for storage in the backend.
  */
-function compressAndEncodeImage(file: File): Promise<string> {
+function compressAndEncodeImage(
+  file: File,
+  maxSize = 800,
+  quality = 0.85,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    const blobUrl = URL.createObjectURL(file);
+    let blobUrl: string | null = null;
+
+    const cleanup = () => {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+        blobUrl = null;
+      }
+    };
+
+    try {
+      blobUrl = URL.createObjectURL(file);
+    } catch {
+      reject(new Error("Could not read the image file."));
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      cleanup();
+      reject(new Error("Image loading timed out."));
+    }, 15000);
 
     img.onload = () => {
+      clearTimeout(timeoutId);
       try {
-        const MAX_SIZE = 800;
         let { width, height } = img;
 
         // Scale down if needed
-        if (width > MAX_SIZE || height > MAX_SIZE) {
+        if (width > maxSize || height > maxSize) {
           if (width >= height) {
-            height = Math.round((height * MAX_SIZE) / width);
-            width = MAX_SIZE;
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
           } else {
-            width = Math.round((width * MAX_SIZE) / height);
-            height = MAX_SIZE;
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
           }
+        }
+
+        // Guard against zero dimensions
+        if (width <= 0 || height <= 0) {
+          cleanup();
+          reject(new Error("Invalid image dimensions."));
+          return;
         }
 
         const canvas = document.createElement("canvas");
@@ -55,24 +134,45 @@ function compressAndEncodeImage(file: File): Promise<string> {
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          reject(new Error("Canvas context unavailable"));
+          cleanup();
+          reject(
+            new Error(
+              "Canvas context unavailable. Please try a different browser.",
+            ),
+          );
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Encode as JPEG with 85% quality — good balance of size and fidelity
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        // Encode as JPEG — good balance of size and fidelity
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+
+        if (!dataUrl || dataUrl === "data:,") {
+          cleanup();
+          reject(
+            new Error("Failed to encode image. The image may be corrupted."),
+          );
+          return;
+        }
+
+        cleanup();
         resolve(dataUrl);
       } catch (err) {
-        reject(err);
-      } finally {
-        URL.revokeObjectURL(blobUrl);
+        cleanup();
+        reject(
+          err instanceof Error ? err : new Error("Image processing failed."),
+        );
       }
     };
 
     img.onerror = () => {
-      URL.revokeObjectURL(blobUrl);
-      reject(new Error("Failed to load image"));
+      clearTimeout(timeoutId);
+      cleanup();
+      reject(
+        new Error(
+          "Failed to load image. The file may be corrupted or unsupported.",
+        ),
+      );
     };
 
     img.src = blobUrl;

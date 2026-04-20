@@ -56,12 +56,14 @@ function RuleRow({ label, met }: { label: string; met: boolean }) {
 function PasswordRegistrationForm() {
   const { registerWithPassword, isRegisteringWithPassword } = useCurrentUser();
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [bio, setBio] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
   const { t, isRTL } = useLanguage();
   const qc = useQueryClient();
 
@@ -75,6 +77,7 @@ function PasswordRegistrationForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(true);
+    setUsernameError("");
     if (!username.trim()) {
       toast.error(t.usernameRequired2);
       return;
@@ -91,12 +94,22 @@ function PasswordRegistrationForm() {
       await registerWithPassword({
         username: username.trim(),
         password,
+        email: email.trim() || undefined,
         bio: bio.trim(),
       });
       toast.success(t.welcomeToast);
       qc.invalidateQueries({ queryKey: ["myProfile"] });
-    } catch {
-      toast.error(t.registrationFailed);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (
+        msg.includes("reserved") ||
+        msg.includes("réservé") ||
+        msg.includes("محجوز")
+      ) {
+        setUsernameError(t.usernameReservedError);
+      } else {
+        toast.error(t.registrationFailed);
+      }
     }
   };
 
@@ -109,7 +122,7 @@ function PasswordRegistrationForm() {
       dir={isRTL ? "rtl" : "ltr"}
     >
       <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-xl">
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center">
             <Shield className="w-5 h-5 text-primary" />
           </div>
@@ -121,6 +134,17 @@ function PasswordRegistrationForm() {
               {t.passwordSectionSubtitle}
             </p>
           </div>
+        </div>
+
+        {/* Security protection message */}
+        <div
+          className="flex items-start gap-2 mb-5 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20"
+          data-ocid="registration.security_msg"
+        >
+          <span className="text-base leading-none mt-0.5">🔒</span>
+          <p className="text-xs text-blue-400 leading-relaxed">
+            {t.securityProtectionMsg}
+          </p>
         </div>
 
         <form
@@ -137,12 +161,42 @@ function PasswordRegistrationForm() {
               id="reg-username"
               placeholder={t.usernamePlaceholder}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (usernameError) setUsernameError("");
+              }}
               disabled={isSubmitting}
               maxLength={32}
               required
               autoComplete="username"
               data-ocid="registration.username_input"
+              className={`bg-secondary border-input ${usernameError ? "border-destructive focus-visible:ring-destructive/30" : ""}`}
+            />
+            {usernameError && (
+              <p
+                className="text-xs text-destructive mt-1"
+                data-ocid="registration.username_reserved_error"
+              >
+                {usernameError}
+              </p>
+            )}
+          </div>
+
+          {/* Email (optional) */}
+          <div className="space-y-1.5">
+            <Label htmlFor="reg-email" className="text-sm font-medium">
+              {t.emailLabel}
+            </Label>
+            <Input
+              id="reg-email"
+              type="email"
+              placeholder="example@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isSubmitting}
+              maxLength={254}
+              autoComplete="email"
+              data-ocid="registration.email_input"
               className="bg-secondary border-input"
             />
           </div>

@@ -19,10 +19,14 @@ export function useCurrentUser() {
       queryKey: ["myProfile"],
       queryFn: async () => {
         if (!actor) return null;
-        return actor.getMyProfile();
+        try {
+          return await actor.getMyProfile();
+        } catch {
+          return null;
+        }
       },
       enabled: !!actor && !isFetching,
-      retry: false,
+      retry: 1,
     });
 
   // Basic registration (username + bio only, no password validation)
@@ -39,15 +43,21 @@ export function useCurrentUser() {
     },
   });
 
-  // Registration with password — calls backend registerWithPassword(username, password, bio)
+  // Registration with password — calls backend registerWithPassword(username, password, bio, email)
   const registerWithPasswordMutation = useMutation({
     mutationFn: async ({
       username,
       password,
+      email,
       bio,
-    }: { username: string; password: string; bio: string }) => {
+    }: { username: string; password: string; email?: string; bio: string }) => {
       if (!actor) throw new Error("Not authenticated");
-      const result = await actor.registerWithPassword(username, password, bio);
+      const result = await actor.registerWithPassword(
+        username,
+        password,
+        bio,
+        email ?? null,
+      );
       if (result.__kind__ === "err") throw new Error(result.err);
       return result.ok;
     },

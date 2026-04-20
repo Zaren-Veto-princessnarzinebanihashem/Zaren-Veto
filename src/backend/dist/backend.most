@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type CommentId__740647676 = Nat;
 type Comment__495386713 =
   {
@@ -90,6 +90,51 @@ type Notification__920622627 =
     notifType : NotificationType__857889678;
     recipientId : UserId__158757552
   };
+type OldMessage__897832057 =
+  {
+    conversationId : ConversationId__966455625;
+    createdAt : Timestamp__301639476;
+    encryptedContent : Blob;
+    id : MessageId__291319400;
+    var readBy : [UserId__158757552];
+    senderId : UserId__158757552
+  };
+type OldPost__784581407 =
+  {
+    authorId : UserId__158757552;
+    authorName : Text;
+    var content : Text;
+    createdAt : Timestamp__301639476;
+    var customAllowList : [UserId__158757552];
+    id : PostId__861309770;
+    var imageUrl : ?Text;
+    var isPinned : Bool;
+    var updatedAt : Timestamp__301639476;
+    visibility : OldVisibility__622755988
+  };
+type OldUser__655922588 =
+  {
+    var aboutBio : ?Text;
+    var aboutEducation : ?Text;
+    var aboutLocation : ?Text;
+    var aboutWebsite : ?Text;
+    var aboutWork : ?Text;
+    var bio : Text;
+    var birthdate : ?Text;
+    var coverPhotoUrl : ?Text;
+    var email : ?Text;
+    id : UserId__158757552;
+    var isBanned : Bool;
+    var isSuspended : Bool;
+    var isVerified : Bool;
+    var passwordHash : ?Text;
+    var profilePhotoUrl : ?Text;
+    var suspendedUntil : ?Timestamp__301639476;
+    var username : Text;
+    var visibility : OldVisibility__622755988
+  };
+type OldVisibility__622755988 =
+  {#customList; #everyone; #followersOnly; #friendsOnly};
 type PollId__295255594 = Nat;
 type PollOption__852629614 = {id : Nat; text : Text};
 type PollVote__953216253 =
@@ -168,10 +213,13 @@ type User__411373797 =
     var bio : Text;
     var birthdate : ?Text;
     var coverPhotoUrl : ?Text;
+    var email : ?Text;
     id : UserId__158757552;
     var isBanned : Bool;
     var isSuspended : Bool;
     var isVerified : Bool;
+    var officialPageCoverPhotoUrl : ?Text;
+    var officialPageProfilePhotoUrl : ?Text;
     var passwordHash : ?Text;
     var profilePhotoUrl : ?Text;
     var suspendedUntil : ?Timestamp__301639476;
@@ -180,7 +228,45 @@ type User__411373797 =
   };
 type Visibility__499707805 =
   {#customList; #everyone; #followersOnly; #friendsOnly};
-actor {
+actor ({
+  in blockedUsers :
+    Map__605269027<UserId__158757552, Set__532252804<UserId__158757552>>;
+  in comments : List__415060402<Comment__495386713>;
+  in follows :
+    Map__605269027<UserId__158757552, Set__532252804<UserId__158757552>>;
+  in friendRequests : List__415060402<FriendRequest__180764053>;
+  in hashtagIndex : Map__605269027<Text, List__415060402<PostId__861309770>>;
+  in hashtagPostTime :
+    Map__605269027<Text, List__415060402<Timestamp__301639476>>;
+  in likes :
+    Map__605269027<PostId__861309770, Set__532252804<UserId__158757552>>;
+  in messages : List__415060402<OldMessage__897832057>;
+  in msgReactions : List__415060402<MessageReaction__11955573>;
+  in nextCommentId : {var value : Nat};
+  in nextFriendReqId : {var value : Nat};
+  in nextMessageId : {var value : Nat};
+  in nextNotifId : {var value : Nat};
+  in nextPollId : {var value : Nat};
+  in nextPostId : {var value : Nat};
+  in nextReportId : {var value : Nat};
+  in nextStoryId : {var value : Nat};
+  in notifications : List__415060402<Notification__920622627>;
+  in officialPagePosts : List__415060402<OldPost__784581407>;
+  in pinnedPosts : Map__605269027<UserId__158757552, PostId__861309770>;
+  in pollVotes : List__415060402<PollVote__953216253>;
+  in polls : List__415060402<Poll__1055658710>;
+  in posts : List__415060402<OldPost__784581407>;
+  in reactions :
+    Map__605269027<PostId__861309770,
+                    Map__605269027<UserId__158757552, ReactionType__110811559>>;
+  in reports : List__415060402<Report__833543126>;
+  in savedPosts :
+    Map__605269027<UserId__158757552, Set__532252804<PostId__861309770>>;
+  in shares : List__415060402<Share__777168058>;
+  in stories : List__415060402<Story__838062551>;
+  in users : Map__605269027<UserId__158757552, OldUser__655922588>;
+  in verified : Set__532252804<UserId__158757552>
+}, {
   stable blockedUsers :
     {
       var root :
@@ -315,4 +401,4 @@ actor {
     };
   stable verified :
     {var root : Node__92254746<UserId__158757552>; var size : Nat__490723111}
-};
+}) ;

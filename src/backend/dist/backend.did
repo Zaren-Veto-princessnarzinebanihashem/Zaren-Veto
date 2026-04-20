@@ -238,15 +238,18 @@ service : {
   getMessageReactions: (messageId: MessageId) ->
    (vec MessageReactionView) query;
   getMessages: (otherUser: UserId) -> (vec MessageView) query;
+  getMyEmail: () -> (opt text) query;
   getMyProfile: () -> (opt UserProfile) query;
   getMyReaction: (postId: PostId) -> (opt ReactionType);
   getMyStories: () -> (vec StoryView) query;
   getNotifications: () -> (vec NotificationView);
   getOfficialPage: () -> (UserProfile) query;
+  getOfficialPageLink: () -> (text) query;
   getOfficialPagePosts: (page: nat, pageSize: nat) -> (vec PostView) query;
   getPendingRequests: () -> (vec FriendRequestView) query;
   getPollResults: (pollId: nat) -> (PollResults) query;
   getPostStats: (postId: PostId) -> (PostStats) query;
+  getProfileLink: (userId: UserId) -> (text) query;
   getReactions: (postId: PostId) -> (vec record {
                                            ReactionType;
                                            nat;
@@ -267,17 +270,22 @@ service : {
   isFollowing: (target: UserId) -> (bool) query;
   isVerified: (userId: UserId) -> (bool) query;
   likePost: (postId: PostId) -> ();
+  loginWithPassword: (username: text, password: text) ->
+   (variant {
+      err: text;
+      ok: UserProfile;
+    });
   markMessageRead: (messageId: MessageId) -> ();
   markNotificationsRead: () -> ();
   pinPost: (postId: PostId) -> (bool);
   reactToMessage: (messageId: MessageId, reaction: ReactionType) -> (bool);
   reactToPost: (postId: PostId, reaction: ReactionType) -> ();
   register: (username: text, bio: text) -> (bool);
-  registerWithPassword: (username: text, password: text, bio: text) ->
-   (variant {
-      err: text;
-      ok: bool;
-    });
+  registerWithPassword: (username: text, password: text, bio: text, email:
+   opt text) -> (variant {
+                   err: text;
+                   ok: bool;
+                 });
   removeMessageReaction: (messageId: MessageId) -> (bool);
   removeReaction: (postId: PostId) -> ();
   replyToComment: (parentCommentId: CommentId, "text": text) -> (CommentId);
@@ -301,10 +309,26 @@ service : {
   unsharePost: (postId: PostId) -> ();
   updateAbout: (bio: opt text, location: opt text, work: opt text, education:
    opt text, website: opt text) -> (bool);
-  updateCoverPhoto: (imageUrl: text) -> ();
+  updateCoverPhoto: (imageUrl: text) -> (variant {
+                                           err: text;
+                                           ok;
+                                         });
+  updateEmail: (email: text) -> (bool);
+  updateOfficialPageCoverPhoto: (imageUrl: text) -> (variant {
+                                                       err: text;
+                                                       ok;
+                                                     });
+  updateOfficialPageProfilePhoto: (imageUrl: text) ->
+   (variant {
+      err: text;
+      ok;
+    });
   updateProfile: (username: text, bio: text, visibility: Visibility) ->
    (bool);
-  updateProfilePhoto: (imageUrl: text) -> ();
+  updateProfilePhoto: (imageUrl: text) -> (variant {
+                                             err: text;
+                                             ok;
+                                           });
   viewStory: (storyId: nat) -> ();
   votePoll: (pollId: nat, optionId: nat) -> (bool);
 }

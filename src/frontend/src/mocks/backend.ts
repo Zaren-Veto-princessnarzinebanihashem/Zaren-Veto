@@ -1,8 +1,20 @@
 import type { backendInterface } from "../backend";
 import { Principal } from "@icp-sdk/core/principal";
-import { ReactionType, Visibility } from "../backend";
+import { ReactionType, Visibility, type UserProfile } from "../backend";
 
 const samplePrincipal = Principal.fromText("2vxsx-fae");
+
+const mockUserProfile: UserProfile = {
+  id: samplePrincipal,
+  username: "zaren_user",
+  bio: "",
+  postCount: BigInt(0),
+  followerCount: BigInt(0),
+  followingCount: BigInt(0),
+  isVerified: false,
+  isOfficialPage: false,
+  visibility: Visibility.everyone,
+};
 
 const mockPost = (overrides: { id: bigint; content: string; authorName: string; visibility: Visibility; createdAt: bigint }) => ({
   authorVerified: false,
@@ -123,9 +135,9 @@ export const mockBackend: backendInterface = {
   unlikePost: async () => {},
   unsavePost: async () => {},
   unsharePost: async () => {},
-  updateCoverPhoto: async () => {},
+  updateCoverPhoto: async () => ({ __kind__: "ok" as const, ok: null }),
   updateProfile: async () => true,
-  updateProfilePhoto: async () => {},
+  updateProfilePhoto: async () => ({ __kind__: "ok" as const, ok: null }),
 
   // New methods
   banUser: async () => true,
@@ -194,6 +206,14 @@ export const mockBackend: backendInterface = {
   createOfficialPost: async () => ({ __kind__: "ok" as const, ok: BigInt(1) }),
   getOfficialPagePosts: async () => [],
   registerWithPassword: async () => ({ __kind__: "ok" as const, ok: true }),
+  getOfficialPageLink: async () => "https://example.com/official",
+  getProfileLink: async () => "https://example.com/profile/demo",
+  // Security methods
+  getMyEmail: async () => null,
+  loginWithPassword: async () => ({ __kind__: "ok" as const, ok: mockUserProfile }),
+  updateEmail: async () => true,
+  updateOfficialPageCoverPhoto: async (_url: string) => ({ ok: null } as any),
+  updateOfficialPageProfilePhoto: async (_url: string) => ({ ok: null } as any),
 };
 
 // Suppress unused import warning

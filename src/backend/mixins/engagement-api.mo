@@ -247,17 +247,57 @@ mixin (
 
   // ── Profile media ─────────────────────────────────────────────────────────
 
-  public shared ({ caller }) func updateProfilePhoto(imageUrl : Text) : async () {
+  public shared ({ caller }) func updateProfilePhoto(imageUrl : Text) : async { #ok; #err : Text } {
+    if (caller.isAnonymous()) return #err("Anonymous callers cannot update profile");
     switch (users.get(caller)) {
-      case null Runtime.trap("Not registered");
-      case (?user) { user.profilePhotoUrl := ?imageUrl };
+      case null { #err("Not registered") };
+      case (?user) {
+        user.profilePhotoUrl := ?imageUrl;
+        #ok;
+      };
     };
   };
 
-  public shared ({ caller }) func updateCoverPhoto(imageUrl : Text) : async () {
+  public shared ({ caller }) func updateCoverPhoto(imageUrl : Text) : async { #ok; #err : Text } {
+    if (caller.isAnonymous()) return #err("Anonymous callers cannot update profile");
     switch (users.get(caller)) {
-      case null Runtime.trap("Not registered");
-      case (?user) { user.coverPhotoUrl := ?imageUrl };
+      case null { #err("Not registered") };
+      case (?user) {
+        user.coverPhotoUrl := ?imageUrl;
+        #ok;
+      };
+    };
+  };
+
+  /// Update the official Zaren Veto page profile photo (owner only).
+  /// This is completely independent from the personal profile photo.
+  public shared ({ caller }) func updateOfficialPageProfilePhoto(imageUrl : Text) : async { #ok; #err : Text } {
+    if (caller.isAnonymous()) return #err("Anonymous callers cannot update the official page");
+    switch (users.get(caller)) {
+      case null { #err("Not registered") };
+      case (?user) {
+        if (user.username != "Princess Narzine Bani Hashem") {
+          return #err("Only the page owner can update the official page photo");
+        };
+        user.officialPageProfilePhotoUrl := ?imageUrl;
+        #ok;
+      };
+    };
+  };
+
+  /// Update the official Zaren Veto page cover photo (owner only).
+  /// This is completely independent from the personal cover photo.
+  public shared ({ caller }) func updateOfficialPageCoverPhoto(imageUrl : Text) : async { #ok; #err : Text } {
+    if (caller.isAnonymous()) return #err("Anonymous callers cannot update the official page");
+    switch (users.get(caller)) {
+      case null { #err("Not registered") };
+      case (?user) {
+        if (user.username != "Princess Narzine Bani Hashem") {
+          return #err("Only the page owner can update the official page cover");
+        };
+        user.officialPageCoverPhotoUrl := ?imageUrl;
+        #ok;
+      };
     };
   };
 

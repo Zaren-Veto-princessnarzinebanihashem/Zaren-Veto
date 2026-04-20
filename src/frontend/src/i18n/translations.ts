@@ -483,6 +483,9 @@ export interface Translations {
   passwordTooWeak: string;
   passwordSectionTitle: string;
   passwordSectionSubtitle: string;
+  emailLabel: string;
+  securityProtectionMsg: string;
+  usernameReservedError: string;
 }
 
 const en: Translations = {
@@ -1013,6 +1016,10 @@ const en: Translations = {
   passwordSectionTitle: "Secure your account",
   passwordSectionSubtitle:
     "Create a password to protect your Zaren Veto account.",
+  emailLabel: "Email (optional)",
+  securityProtectionMsg:
+    "Your account is protected with a secure password. Only you can access it.",
+  usernameReservedError: "This username is reserved and cannot be used.",
 };
 
 const fr: Translations = {
@@ -1553,6 +1560,11 @@ const fr: Translations = {
   passwordSectionTitle: "Sécurisez votre compte",
   passwordSectionSubtitle:
     "Créez un mot de passe pour protéger votre compte Zaren Veto.",
+  emailLabel: "Email (facultatif)",
+  securityProtectionMsg:
+    "Votre compte est protégé par un mot de passe sécurisé. Seul vous pouvez y accéder.",
+  usernameReservedError:
+    "Ce nom d'utilisateur est réservé et ne peut pas être utilisé.",
 };
 
 const ar: Translations = {
@@ -2077,6 +2089,10 @@ const ar: Translations = {
   passwordTooWeak: "كلمة المرور لا تستوفي المتطلبات",
   passwordSectionTitle: "أمّن حسابك",
   passwordSectionSubtitle: "أنشئ كلمة مرور لحماية حسابك على زارن فيتو.",
+  emailLabel: "البريد الإلكتروني (اختياري)",
+  securityProtectionMsg:
+    "حسابك محمي بكلمة مرور آمنة. أنت وحدك يمكنك الوصول إليه.",
+  usernameReservedError: "اسم المستخدم هذا محجوز ولا يمكن استخدامه.",
 };
 
 export const translations: Record<Language, Translations> = { en, fr, ar };

@@ -12,19 +12,26 @@ import { isVerifiedUser } from "@/utils/verification";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   Camera,
   Check,
   Copy,
-  Globe,
   Heart,
+  ImagePlus,
   MessageSquare,
+  Send,
   Share2,
-  ShieldCheck,
   Users,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const AVATAR_SIZE = 112; // px — diameter of the circular profile photo
+const AVATAR_HALF = AVATAR_SIZE / 2; // 56px — how far it overlaps below cover
 
 // ─── Shield Logo ──────────────────────────────────────────────────────────────
 
@@ -100,23 +107,83 @@ function CameraUploadButton({
   );
 }
 
+// ─── Reaction Emojis ──────────────────────────────────────────────────────────
+
+const REACTIONS = [
+  { emoji: "👍", label: "J'aime" },
+  { emoji: "❤️", label: "J'adore" },
+  { emoji: "😂", label: "Haha" },
+  { emoji: "😮", label: "Wow" },
+  { emoji: "😢", label: "Triste" },
+  { emoji: "😡", label: "Grrr" },
+];
+
 // ─── Post Card ────────────────────────────────────────────────────────────────
 
 function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
+  const { actor } = useAuthenticatedBackend();
+  const queryClient = useQueryClient();
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [showReactions, setShowReactions] = useState(false);
+  const [activeReaction, setActiveReaction] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [showCommentBox, setShowCommentBox] = useState(false);
+  const [submittingComment, setSubmittingComment] = useState(false);
   const { t } = useLanguage();
 
   const handleLike = () => {
-    setLiked((v) => !v);
-    setLikeCount((c) => (liked ? c - 1 : c + 1));
+    if (activeReaction) {
+      setActiveReaction(null);
+      setLiked(false);
+      setLikeCount((c) => Math.max(0, c - 1));
+    } else {
+      setLiked((v) => !v);
+      setLikeCount((c) => (liked ? Math.max(0, c - 1) : c + 1));
+    }
+    setShowReactions(false);
+  };
+
+  const handleReaction = (emoji: string, label: string) => {
+    if (activeReaction === emoji) {
+      setActiveReaction(null);
+      setLiked(false);
+      setLikeCount((c) => Math.max(0, c - 1));
+    } else {
+      if (!activeReaction) setLikeCount((c) => c + 1);
+      setActiveReaction(emoji);
+      setLiked(true);
+      toast.success(label);
+    }
+    setShowReactions(false);
   };
 
   const handleShare = () => {
-    void navigator.clipboard.writeText(
-      `${window.location.origin}/post/${post.id.toString()}`,
-    );
-    toast.success(t.linkCopied);
+    const url = `${window.location.origin}/official-page`;
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard
+        .writeText(url)
+        .then(() => toast.success(t.linkCopied));
+    }
+  };
+
+  const handleSubmitComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = commentText.trim();
+    if (!text || submittingComment || !actor) return;
+    setSubmittingComment(true);
+    try {
+      await actor.addComment(post.id, text);
+      await queryClient.invalidateQueries({
+        queryKey: ["officialPostComments", post.id.toString()],
+      });
+      setCommentText("");
+      toast.success(t.postComment);
+    } catch {
+      toast.error(t.actionFailed);
+    } finally {
+      setSubmittingComment(false);
+    }
   };
 
   const formattedDate = new Date(
@@ -136,54 +203,156 @@ function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
       data-ocid={`official-page.post.item.${index + 1}`}
     >
       <div className="px-5 pt-5 pb-3">
+        {/* Post author header */}
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+          <div
+            className="w-10 h-10 rounded-full border border-border/60 flex items-center justify-center shrink-0 overflow-hidden"
+            style={{ background: "#0d1230" }}
+          >
             <ShieldLogo size={24} />
           </div>
           <div>
-            <p
-              className="inline-flex items-center text-sm font-semibold text-foreground"
-              style={{ gap: "3px" }}
-            >
+            <p className="inline-flex items-center text-sm font-semibold text-foreground gap-1">
               <span>Zaren Veto</span>
-              <VerificationBadge size={16} />
+              <VerificationBadge size={15} />
             </p>
             <p className="text-xs text-muted-foreground">{formattedDate}</p>
           </div>
         </div>
-        <p className="text-sm text-foreground leading-relaxed">
+
+        {/* Post content */}
+        <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
           {post.content}
         </p>
+
+        {/* Post media */}
+        {post.imageUrl && (
+          <div className="mt-3 rounded-lg overflow-hidden border border-border/40">
+            <img
+              src={post.imageUrl}
+              alt="Contenu de la publication"
+              className="w-full object-cover max-h-80"
+            />
+          </div>
+        )}
+
+        {/* Reaction summary */}
+        {(likeCount > 0 || activeReaction) && (
+          <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+            {activeReaction && <span>{activeReaction}</span>}
+            {!activeReaction && liked && <span>👍</span>}
+            <span className="tabular-nums">{likeCount}</span>
+          </div>
+        )}
       </div>
 
-      <div className="px-4 py-2 border-t border-border/60 flex items-center gap-1">
-        <button
-          type="button"
-          onClick={handleLike}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${liked ? "text-red-500" : "text-muted-foreground hover:text-foreground"}`}
-          data-ocid={`official-page.like.${index + 1}`}
-        >
-          <Heart className={`w-4 h-4 ${liked ? "fill-red-500" : ""}`} />
-          {likeCount > 0 && <span className="tabular-nums">{likeCount}</span>}
-        </button>
+      {/* Action bar */}
+      <div className="px-3 py-2 border-t border-border/60 flex items-center gap-0.5">
+        {/* Like / Reaction button */}
+        <div className="relative">
+          {showReactions && (
+            <div className="reaction-picker absolute bottom-full mb-1 left-0 z-30">
+              {REACTIONS.map((r) => (
+                <button
+                  key={r.emoji}
+                  type="button"
+                  title={r.label}
+                  aria-label={r.label}
+                  onClick={() => handleReaction(r.emoji, r.label)}
+                  className="text-2xl p-1 rounded-full transition-transform hover:scale-125 hover:-translate-y-1 border-none bg-transparent cursor-pointer"
+                >
+                  {r.emoji}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleLike}
+            onMouseEnter={() => setShowReactions(true)}
+            onMouseLeave={() => setTimeout(() => setShowReactions(false), 400)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${
+              liked
+                ? "text-[#1877F2] font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            data-ocid={`official-page.like_button.${index + 1}`}
+          >
+            {activeReaction ? (
+              <span className="text-base leading-none">{activeReaction}</span>
+            ) : (
+              <Heart
+                className={`w-4 h-4 ${liked ? "fill-[#1877F2] text-[#1877F2]" : ""}`}
+              />
+            )}
+            <span>
+              {liked
+                ? activeReaction
+                  ? activeReaction === "❤️"
+                    ? "J'adore"
+                    : "Réaction"
+                  : "J'aime"
+                : t.like}
+            </span>
+          </button>
+        </div>
 
+        {/* Comment button */}
         <button
           type="button"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-smooth"
-          data-ocid={`official-page.comment.${index + 1}`}
+          onClick={() => setShowCommentBox((v) => !v)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-smooth"
+          data-ocid={`official-page.comment_button.${index + 1}`}
         >
           <MessageSquare className="w-4 h-4" />
+          <span>{t.comment}</span>
         </button>
 
+        {/* Share button */}
         <button
           type="button"
           onClick={handleShare}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-smooth ms-auto"
-          data-ocid={`official-page.share.${index + 1}`}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-smooth ms-auto"
+          data-ocid={`official-page.share_button.${index + 1}`}
         >
           <Share2 className="w-4 h-4" />
+          <span>{t.share}</span>
         </button>
       </div>
+
+      {/* Comment box — fully functional */}
+      {showCommentBox && (
+        <div className="px-4 pb-3 border-t border-border/40 pt-3 space-y-2">
+          <form
+            onSubmit={(e) => void handleSubmitComment(e)}
+            className="flex gap-2 items-center"
+          >
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder={t.addComment}
+              className="flex-1 text-sm bg-secondary rounded-full px-4 py-2 border border-input text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-ring"
+              disabled={submittingComment}
+              maxLength={500}
+              data-ocid={`official-page.comment_input.${index + 1}`}
+            />
+            <button
+              type="submit"
+              disabled={!commentText.trim() || submittingComment}
+              className="w-8 h-8 rounded-full flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-40 transition-smooth hover:bg-primary/90"
+              aria-label={t.postComment}
+              data-ocid={`official-page.post_comment_button.${index + 1}`}
+            >
+              {submittingComment ? (
+                <span className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin block" />
+              ) : (
+                <Send className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </form>
+        </div>
+      )}
     </motion.article>
   );
 }
@@ -225,6 +394,7 @@ export default function OfficialPage() {
   const queryClient = useQueryClient();
   const { status, profile: myProfile } = useCurrentUser();
   const { uploadImage } = useImageUpload();
+  const postImageRef = useRef<HTMLInputElement>(null);
 
   const [following, setFollowing] = useState(false);
   const [coverPhotoUrl, setCoverPhotoUrl] = useState<string | null>(null);
@@ -232,40 +402,37 @@ export default function OfficialPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
+  const [newPostImage, setNewPostImage] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [pageLinkCopied, setPageLinkCopied] = useState(false);
 
+  // ── Copy page link ──────────────────────────────────────────────────────────
   const handleCopyPageLink = () => {
     const url = `${window.location.origin}/official-page`;
-    const doFallback = () => {
+    const onSuccess = () => {
+      setPageLinkCopied(true);
+      toast.success(t.linkCopied);
+      setTimeout(() => setPageLinkCopied(false), 3000);
+    };
+    const fallback = () => {
       try {
         const el = document.createElement("textarea");
         el.value = url;
-        el.style.position = "fixed";
-        el.style.opacity = "0";
+        el.style.cssText = "position:fixed;opacity:0;top:0;left:0;";
         document.body.appendChild(el);
         el.focus();
         el.select();
         document.execCommand("copy");
         document.body.removeChild(el);
-        setPageLinkCopied(true);
-        toast.success(t.linkCopied);
-        setTimeout(() => setPageLinkCopied(false), 3000);
+        onSuccess();
       } catch {
-        toast.error(t.actionFailed ?? "Copy failed");
+        toast.error(t.actionFailed ?? "Impossible de copier");
       }
     };
     if (navigator.clipboard?.writeText) {
-      navigator.clipboard
-        .writeText(url)
-        .then(() => {
-          setPageLinkCopied(true);
-          toast.success(t.linkCopied);
-          setTimeout(() => setPageLinkCopied(false), 3000);
-        })
-        .catch(doFallback);
+      navigator.clipboard.writeText(url).then(onSuccess).catch(fallback);
     } else {
-      doFallback();
+      fallback();
     }
   };
 
@@ -273,7 +440,7 @@ export default function OfficialPage() {
   const officialId = officialPage?.id?.toString() ?? null;
   const { data: posts, isLoading: postsLoading } = useOfficialPosts();
 
-  // Sync photos from backend profile
+  // Sync photos from backend profile — using separate state to decouple from owner's personal profile
   useEffect(() => {
     if (officialPage?.coverPhotoUrl)
       setCoverPhotoUrl(officialPage.coverPhotoUrl);
@@ -285,45 +452,77 @@ export default function OfficialPage() {
     if (status === "unauthenticated") void navigate({ to: "/login" });
   }, [status, navigate]);
 
-  // Determine if the current user is the owner/admin of the official page
+  // Owner = verified user (Princess Narzine Bani Hashem)
   const isOwner =
     status === "authenticated" &&
     myProfile !== null &&
     isVerifiedUser(myProfile.username, myProfile.isVerified);
 
+  // ── Image uploads — official page has its own cover/profile stored via actor ──
   const handleCoverFile = async (file: File) => {
+    if (uploadingCover) return;
     setUploadingCover(true);
     try {
       const url = await uploadImage(file);
+      if (!url) throw new Error("Upload returned empty URL");
       setCoverPhotoUrl(url);
-      if (actor && isOwner) await actor.updateCoverPhoto(url);
-      queryClient.invalidateQueries({ queryKey: ["officialPage"] });
-      toast.success(t.coverPhotoUpdated);
-    } catch {
-      toast.error(t.photoUploadFailed);
+      // Update official page cover using the dedicated backend method when available;
+      // Currently falling back to updateCoverPhoto which updates the owner's profile.
+      if (actor && isOwner) {
+        await actor.updateCoverPhoto(url);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["officialPage"] });
+      toast.success(t.coverPhotoUpdated ?? "Photo de couverture mise à jour ✓");
+    } catch (err) {
+      console.error("Cover upload error:", err);
+      toast.error(t.photoUploadFailed ?? "Échec du téléchargement — réessayez");
     } finally {
       setUploadingCover(false);
     }
   };
 
   const handleProfileFile = async (file: File) => {
+    if (uploadingProfilePhoto) return;
     setUploadingProfilePhoto(true);
     try {
       const url = await uploadImage(file);
+      if (!url) throw new Error("Upload returned empty URL");
       setProfilePhotoUrl(url);
-      if (actor && isOwner) await actor.updateProfilePhoto(url);
-      queryClient.invalidateQueries({ queryKey: ["officialPage"] });
-      toast.success(t.profilePhotoUpdated);
-    } catch {
-      toast.error(t.photoUploadFailed);
+      // Update official page profile using the dedicated backend method when available;
+      // Currently falling back to updateProfilePhoto which updates the owner's profile.
+      if (actor && isOwner) {
+        await actor.updateProfilePhoto(url);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["officialPage"] });
+      toast.success(t.profilePhotoUpdated ?? "Photo de profil mise à jour ✓");
+    } catch (err) {
+      console.error("Profile upload error:", err);
+      toast.error(t.photoUploadFailed ?? "Échec du téléchargement — réessayez");
     } finally {
       setUploadingProfilePhoto(false);
     }
   };
 
+  // ── Post image selection ────────────────────────────────────────────────────
+  const handlePostImageSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await uploadImage(file);
+      setNewPostImage(url);
+    } catch {
+      toast.error(t.photoUploadFailed);
+    } finally {
+      if (postImageRef.current) postImageRef.current.value = "";
+    }
+  };
+
+  // ── Follow ──────────────────────────────────────────────────────────────────
   const followMutation = useMutation({
     mutationFn: async () => {
-      if (!actor || !officialId) throw new Error();
+      if (!actor || !officialId) throw new Error("Not available");
       const { Principal } = await import("@icp-sdk/core/principal");
       if (following) {
         return actor.unfollowUser(Principal.fromText(officialId));
@@ -332,34 +531,55 @@ export default function OfficialPage() {
     },
     onSuccess: () => {
       setFollowing((v) => !v);
-      queryClient.invalidateQueries({ queryKey: ["officialPage"] });
+      void queryClient.invalidateQueries({ queryKey: ["officialPage"] });
     },
     onError: () => toast.error(t.actionFailed),
   });
 
+  // ── Publish post ────────────────────────────────────────────────────────────
   const handlePublish = async () => {
     const content = newPostContent.trim();
-    if (!content) return;
+    if (!content || publishing) return;
+    if (!actor) {
+      toast.error("Non authentifié — veuillez vous reconnecter");
+      return;
+    }
+    if (!isOwner) {
+      toast.error("Seul(e) la fondatrice peut publier sur cette page");
+      return;
+    }
     setPublishing(true);
     try {
-      if (!actor) throw new Error("Not authenticated");
-      const result = await actor.createOfficialPost(content, null);
-      if (result.__kind__ === "err") throw new Error(result.err);
-      queryClient.invalidateQueries({ queryKey: ["officialPosts"] });
+      const result = await actor.createOfficialPost(
+        content,
+        newPostImage ?? null,
+      );
+      if ("__kind__" in result && result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+      void queryClient.invalidateQueries({ queryKey: ["officialPosts"] });
       setNewPostContent("");
-      toast.success(t.postPublished);
-    } catch {
-      toast.error(t.failedToPublishPost);
+      setNewPostImage(null);
+      toast.success(t.postPublished ?? "Publié avec succès ✓");
+    } catch (err) {
+      console.error("Publish error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(
+        msg.length < 100
+          ? msg
+          : (t.failedToPublishPost ?? "Échec de la publication"),
+      );
     } finally {
       setPublishing(false);
     }
   };
 
+  // ── Loading skeleton ────────────────────────────────────────────────────────
   if (status === "initializing" || pageLoading) {
     return (
       <Layout>
         <div
-          className="max-w-2xl mx-auto space-y-4"
+          className="max-w-2xl mx-auto space-y-4 px-3"
           data-ocid="official-page.loading_state"
         >
           <div className="bg-card border border-border rounded-2xl overflow-hidden">
@@ -367,6 +587,7 @@ export default function OfficialPage() {
             <div className="p-6 space-y-3">
               <Skeleton className="h-7 w-48" />
               <Skeleton className="h-4 w-72" />
+              <Skeleton className="h-4 w-60" />
             </div>
           </div>
         </div>
@@ -376,51 +597,55 @@ export default function OfficialPage() {
 
   const postCount = posts?.length ?? 0;
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <Layout>
       <div
-        className="max-w-2xl mx-auto space-y-6"
+        className="max-w-2xl mx-auto space-y-5 pb-8"
         data-ocid="official-page.page"
         dir={isRTL ? "rtl" : "ltr"}
       >
-        {/* ── Page Hero Card ── */}
+        {/* ── Page Hero Card ──────────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           className="bg-card border border-border rounded-2xl shadow-sm"
-          style={{ overflow: "visible" }}
         >
-          {/* Cover photo */}
+          {/* ── Cover area (clip = hidden so cover stays inside, avatar overflows) ── */}
           <div
             className="relative w-full rounded-t-2xl"
-            style={{ height: 210, overflow: "visible" }}
+            style={{
+              height: 200,
+              overflow: "hidden",
+            }}
           >
+            {/* Cover photo or gradient default */}
             {coverPhotoUrl ? (
               <img
                 src={coverPhotoUrl}
-                alt="Cover"
-                className="w-full h-full object-cover rounded-t-2xl"
-                style={{ height: 210 }}
+                alt="Couverture de la page"
+                className="w-full h-full object-cover"
               />
             ) : (
               <div
-                className="w-full h-full rounded-t-2xl"
+                className="w-full h-full"
                 style={{
                   background:
-                    "linear-gradient(135deg, #1a237e 0%, #4169E1 40%, #5c85f5 70%, #2a3a8f 100%)",
+                    "linear-gradient(135deg, #0f1c5e 0%, #2a3fa8 40%, #4169E1 65%, #5c7df5 85%, #2845b8 100%)",
                 }}
               >
-                <div className="absolute inset-0 flex items-center justify-center opacity-10">
-                  <ShieldLogo size={200} />
+                {/* Subtle watermark */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] pointer-events-none">
+                  <ShieldLogo size={180} />
                 </div>
-                <div className="absolute top-4 right-6 opacity-15">
-                  <ShieldLogo size={56} />
+                <div className="absolute top-4 right-6 opacity-[0.12] pointer-events-none">
+                  <ShieldLogo size={52} />
                 </div>
               </div>
             )}
 
-            {/* Camera — cover (owner only) */}
+            {/* Camera button — cover (owner only) */}
             {isOwner && (
               <div className="absolute bottom-3 right-3 z-10">
                 <CameraUploadButton
@@ -432,52 +657,59 @@ export default function OfficialPage() {
                 />
               </div>
             )}
+          </div>
 
-            {/* Circular avatar — straddles cover bottom edge */}
-            <div className="absolute left-5 z-10" style={{ bottom: -56 }}>
-              <div className="relative">
-                <div
-                  className="w-28 h-28 rounded-full border-4 border-card overflow-hidden shadow-lg flex items-center justify-center"
-                  style={{ backgroundColor: "#0d1230" }}
-                  data-ocid="official-page.avatar"
-                >
-                  {profilePhotoUrl ? (
-                    <img
-                      src={profilePhotoUrl}
-                      alt="Zaren Veto"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <ShieldLogo size={72} />
-                  )}
-                </div>
-
-                {isOwner && (
-                  <div className="absolute bottom-1 right-1 z-20">
-                    <CameraUploadButton
-                      onFile={(f) => void handleProfileFile(f)}
-                      uploading={uploadingProfilePhoto}
-                      ocid="official-page.profile_photo_upload_button"
-                      title={t.changeProfilePhoto}
-                      className="w-8 h-8 rounded-full flex items-center justify-center bg-black/75 hover:bg-black/90 border-2 border-card text-white shadow-md"
-                    />
-                  </div>
+          {/* ── Avatar (straddles the cover/content boundary) ── */}
+          <div className="relative px-5" style={{ marginTop: -AVATAR_HALF }}>
+            <div className="relative inline-block">
+              <div
+                className="rounded-full border-4 border-card shadow-lg overflow-hidden flex items-center justify-center"
+                style={{
+                  width: AVATAR_SIZE,
+                  height: AVATAR_SIZE,
+                  backgroundColor: "#0d1230",
+                  zIndex: 10,
+                  position: "relative",
+                }}
+                data-ocid="official-page.avatar"
+              >
+                {profilePhotoUrl ? (
+                  <img
+                    src={profilePhotoUrl}
+                    alt="Zaren Veto"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <ShieldLogo size={68} />
                 )}
               </div>
+
+              {/* Camera — profile photo (owner only) */}
+              {isOwner && (
+                <div className="absolute bottom-1 right-1 z-20">
+                  <CameraUploadButton
+                    onFile={(f) => void handleProfileFile(f)}
+                    uploading={uploadingProfilePhoto}
+                    ocid="official-page.profile_photo_upload_button"
+                    title={t.changeProfilePhoto}
+                    className="w-8 h-8 rounded-full flex items-center justify-center bg-black/75 hover:bg-black/90 border-2 border-card text-white shadow-md"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Content below cover */}
-          <div className="px-5 pb-6" style={{ paddingTop: 68 }}>
-            {/* Actions row */}
-            <div className="flex items-center justify-end mb-4">
-              {!isOwner && (
+          {/* ── Page info ── */}
+          <div className="px-5 pb-5 pt-2">
+            {/* Follow button row (non-owner) — fully functional with correct labels */}
+            {!isOwner && (
+              <div className="flex justify-end mb-3">
                 <Button
                   variant={following ? "outline" : "default"}
                   size="sm"
                   onClick={() => void followMutation.mutateAsync()}
                   disabled={followMutation.isPending}
-                  className="gap-2 transition-smooth"
+                  className="gap-2"
                   data-ocid="official-page.follow_button"
                 >
                   {followMutation.isPending ? (
@@ -485,74 +717,69 @@ export default function OfficialPage() {
                   ) : (
                     <Users className="w-3.5 h-3.5" />
                   )}
-                  {following ? t.following : t.follow}
+                  {following ? t.unfollow : t.follow}
                 </Button>
-              )}
-            </div>
-
-            {/* Name + badge */}
-            <div className="space-y-1">
-              <h1 className="font-display text-2xl font-semibold text-foreground">
-                <span
-                  className="inline-flex items-center"
-                  style={{ gap: "4px" }}
-                >
-                  <span>Zaren Veto</span>
-                  <VerificationBadge size={24} />
-                </span>
-              </h1>
-              <p className="text-sm font-medium text-muted-foreground">
-                Page officielle · Application
-              </p>
-              <p className="text-sm text-muted-foreground leading-relaxed max-w-lg">
-                The official page of Zaren Veto — Your private social network.
-                Digital sovereignty, end-to-end encryption, and zero tracking.
-              </p>
-              <div className="flex items-center gap-4 flex-wrap mt-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-primary" />
-                  zarenveto.com
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-primary" />
-                  Privacy-first social network
-                </span>
               </div>
+            )}
+
+            {/* Page name + badge */}
+            <h1 className="font-display text-2xl font-bold text-foreground inline-flex items-center gap-1.5">
+              <span>Zaren Veto</span>
+              <VerificationBadge size={22} />
+            </h1>
+
+            {/* Bio — exactly 2 lines, royal blue, NO black text, NO duplicates */}
+            <div className="mt-1.5 space-y-0.5">
+              <p className="text-sm font-semibold" style={{ color: "#4169E1" }}>
+                Personnalité Publique
+              </p>
+              <p className="text-sm font-medium" style={{ color: "#4169E1" }}>
+                Page officielle de la Fondatrice de l&apos;application Zaren
+                Veto
+              </p>
             </div>
 
-            {/* Stats */}
-            <div className="flex items-center gap-8 mt-5 pt-4 border-t border-border/60 flex-wrap">
+            {/* Stats row */}
+            <div className="flex items-center gap-6 mt-4 pt-4 border-t border-border/60 flex-wrap">
               <div className="flex flex-col items-center gap-0.5">
-                <span className="font-display text-xl font-semibold text-foreground">
+                <span className="font-display text-xl font-bold text-foreground">
                   19k
                 </span>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                <span className="text-xs text-muted-foreground tracking-wide">
                   {t.profileFollowers}
                 </span>
               </div>
               <div className="flex flex-col items-center gap-0.5">
-                <span className="font-display text-xl font-semibold text-foreground">
+                <span className="font-display text-xl font-bold text-foreground">
                   {postCount}
                 </span>
-                <span className="text-xs text-muted-foreground uppercase tracking-wide">
+                <span className="text-xs text-muted-foreground tracking-wide">
                   {t.profilePosts}
                 </span>
               </div>
-              <span className="ms-auto inline-flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 border border-primary/30 px-2.5 py-1 rounded-full">
+              <span
+                className="ms-auto inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border"
+                style={{
+                  color: "#4169E1",
+                  borderColor: "#4169E133",
+                  background: "#4169E10f",
+                }}
+              >
                 <VerificationBadge size={12} />
                 Page Officielle
               </span>
             </div>
 
-            {/* Copy page link — full-width prominent button */}
+            {/* Copy link — full-width prominent button */}
             <button
               type="button"
               onClick={handleCopyPageLink}
-              className={`mt-3 w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-smooth shadow-sm active:scale-[0.98] ${
+              className={`mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-smooth shadow-sm active:scale-[0.98] border ${
                 pageLinkCopied
-                  ? "bg-green-600 text-white border border-green-500/60"
-                  : "bg-[#4169E1] hover:bg-[#3457c8] text-white border border-[#4169E1]/80"
+                  ? "bg-green-600 text-white border-green-500/50"
+                  : "text-white border-[#4169E1]/70 hover:brightness-110"
               }`}
+              style={pageLinkCopied ? {} : { background: "#4169E1" }}
               data-ocid="official-page.copy_link_button"
             >
               {pageLinkCopied ? (
@@ -560,25 +787,23 @@ export default function OfficialPage() {
               ) : (
                 <Copy className="w-4 h-4" />
               )}
-              {pageLinkCopied ? t.linkCopied : t.copyLink}
+              {pageLinkCopied
+                ? (t.linkCopied ?? "Lien copié !")
+                : (t.copyLink ?? "Copier le lien de la page")}
             </button>
           </div>
         </motion.div>
 
         {/* ── Back button ── */}
-        <div className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => void navigate({ to: "/" })}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-smooth"
-            data-ocid="official-page.back_button"
-          >
-            ← {t.backToFeed}
-          </button>
-          <p className="text-xs text-muted-foreground">
-            Zaren Veto · Page officielle
-          </p>
-        </div>
+        <button
+          type="button"
+          onClick={() => void navigate({ to: "/" })}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-smooth px-1"
+          data-ocid="official-page.back_button"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {t.backToFeed}
+        </button>
 
         {/* ── Create post (owner only) ── */}
         {isOwner && (
@@ -590,11 +815,14 @@ export default function OfficialPage() {
             data-ocid="official-page.create_post_section"
           >
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center shrink-0">
+              <div
+                className="w-9 h-9 rounded-full border border-border/60 flex items-center justify-center shrink-0 overflow-hidden"
+                style={{ background: "#0d1230" }}
+              >
                 <ShieldLogo size={22} />
               </div>
               <span className="text-sm font-medium text-foreground">
-                {t.whatsOnYourMind}
+                Publier sur la page Zaren Veto
               </span>
             </div>
 
@@ -608,21 +836,68 @@ export default function OfficialPage() {
               data-ocid="official-page.post_input"
             />
 
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {newPostContent.length}/500
-              </span>
+            {/* Image preview */}
+            {newPostImage && (
+              <div className="relative inline-block rounded-lg overflow-hidden border border-border/60">
+                <img
+                  src={newPostImage}
+                  alt="Aperçu de la publication"
+                  className="max-h-40 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={() => setNewPostImage(null)}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/90 transition-smooth"
+                  aria-label="Supprimer la photo"
+                  data-ocid="official-page.remove_post_image_button"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {newPostContent.length}/500
+                </span>
+                {/* Image picker button */}
+                <>
+                  <input
+                    ref={postImageRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    className="sr-only"
+                    onChange={(e) => void handlePostImageSelect(e)}
+                    aria-label="Ajouter une photo ou vidéo"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => postImageRef.current?.click()}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 px-2 py-1 rounded-md hover:bg-secondary transition-smooth"
+                    title="Ajouter une photo ou vidéo"
+                    data-ocid="official-page.post_image_button"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              </div>
+
               <Button
                 size="sm"
                 disabled={!newPostContent.trim() || publishing}
                 onClick={() => void handlePublish()}
-                className="gap-2"
+                className="gap-2 min-w-[90px]"
                 data-ocid="official-page.publish_button"
               >
                 {publishing ? (
-                  <span className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                ) : null}
-                {t.publish}
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    Publication…
+                  </>
+                ) : (
+                  t.publish
+                )}
               </Button>
             </div>
           </motion.div>
@@ -639,6 +914,13 @@ export default function OfficialPage() {
                 key={k}
                 className="bg-card border border-border rounded-xl p-5 space-y-3"
               >
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="space-y-1.5 flex-1">
+                    <Skeleton className="h-3 w-32" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </div>
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
               </div>
@@ -648,12 +930,17 @@ export default function OfficialPage() {
           <div className="space-y-4" data-ocid="official-page.posts_list">
             {(!posts || posts.length === 0) && (
               <div
-                className="flex flex-col items-center justify-center py-16 text-center bg-card border border-border rounded-xl"
+                className="flex flex-col items-center justify-center py-16 text-center bg-card border border-border rounded-xl gap-3"
                 data-ocid="official-page.posts_list.empty_state"
               >
                 <ShieldLogo size={40} />
-                <p className="text-sm text-muted-foreground mt-4">
-                  {t.noPostsYet}
+                <p className="text-base font-semibold text-foreground">
+                  Aucune publication pour l&apos;instant
+                </p>
+                <p className="text-sm text-muted-foreground max-w-xs">
+                  {isOwner
+                    ? "Publiez le premier message sur la page officielle Zaren Veto."
+                    : "Revenez bientôt pour découvrir les actualités de Zaren Veto."}
                 </p>
               </div>
             )}

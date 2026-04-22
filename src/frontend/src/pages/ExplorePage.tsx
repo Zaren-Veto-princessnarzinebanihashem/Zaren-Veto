@@ -347,12 +347,12 @@ function PostModal({
             onClick={() => setIsLiked((v) => !v)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
               isLiked
-                ? "text-[#1877F2] bg-[#1877F2]/10"
+                ? "text-[#E0245E] bg-[#E0245E]/10"
                 : "text-muted-foreground hover:bg-secondary hover:text-foreground"
             }`}
             data-ocid="post-modal.like_button"
           >
-            <Heart className={`w-4 h-4 ${isLiked ? "fill-[#1877F2]" : ""}`} />
+            <Heart className={`w-4 h-4 ${isLiked ? "fill-[#E0245E]" : ""}`} />
             {isLiked ? "Liked" : "Like"}
           </button>
           <button

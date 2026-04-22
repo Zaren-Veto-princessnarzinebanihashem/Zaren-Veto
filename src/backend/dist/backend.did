@@ -159,6 +159,14 @@ type MessageReactionView =
    reactor: UserProfile;
  };
 type MessageId = nat;
+type LoginWithPasswordResult = 
+ variant {
+   err: text;
+   ok: record {
+         profile: UserProfile;
+         userId: UserId;
+       };
+ };
 type HashtagStat = 
  record {
    hashtag: text;
@@ -275,6 +283,8 @@ service : {
       err: text;
       ok: UserProfile;
     });
+  loginWithPasswordOnly: (username: text, password: text) ->
+   (LoginWithPasswordResult);
   markMessageRead: (messageId: MessageId) -> ();
   markNotificationsRead: () -> ();
   pinPost: (postId: PostId) -> (bool);

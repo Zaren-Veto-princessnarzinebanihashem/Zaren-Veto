@@ -9,6 +9,7 @@ import {
   Settings,
   User,
   Users,
+  UsersRound,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -76,6 +77,7 @@ export function Navigation({ mobileOnly = false }: NavigationProps) {
       ocid: "nav-messages",
     },
     { to: "/friends", label: t.friends, icon: Users, ocid: "nav-friends" },
+    { to: "/groups", label: "Groupes", icon: UsersRound, ocid: "nav-groups" },
     {
       to: "/settings",
       label: t.settings,

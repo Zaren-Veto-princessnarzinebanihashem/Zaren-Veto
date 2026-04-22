@@ -1207,6 +1207,7 @@ function PostCard({
     null,
   );
   const { t, isRTL: isRtl } = useLanguage();
+  const navigate = useNavigate();
 
   const editPost = useEditPost();
   const deletePost = useDeletePost();
@@ -1218,6 +1219,14 @@ function PostCard({
     currentUserId !== undefined && currentUserId === post.authorId.toString();
   const isEdited = post.updatedAt > post.createdAt;
   const isVerified = isVerifiedUser(post.authorName ?? "");
+
+  // Author profile navigation — any user can click to visit a profile
+  const authorId = post.authorId?.toString();
+  const handleAuthorClick = () => {
+    if (authorId) {
+      void navigate({ to: "/profile/$userId", params: { userId: authorId } });
+    }
+  };
 
   const handleSaveEdit = async () => {
     if (!editContent.trim()) return;
@@ -1301,18 +1310,27 @@ function PostCard({
           {/* Header */}
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0 border border-border text-sm font-bold text-foreground">
+              <button
+                type="button"
+                onClick={handleAuthorClick}
+                className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0 border border-border text-sm font-bold text-foreground hover:opacity-80 transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`View ${post.authorName}'s profile`}
+                data-ocid={`post-author-avatar-${postIdStr}`}
+              >
                 {post.authorName[0]?.toUpperCase() ?? "?"}
-              </div>
+              </button>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <p
-                    className="inline-flex items-center text-sm font-semibold text-foreground min-w-0"
+                  <button
+                    type="button"
+                    onClick={handleAuthorClick}
+                    className="inline-flex items-center text-sm font-semibold text-foreground min-w-0 hover:text-primary transition-smooth focus-visible:outline-none"
                     style={{ gap: "2px" }}
+                    data-ocid={`post-author-name-${postIdStr}`}
                   >
                     <span className="truncate">{post.authorName}</span>
                     {isVerified && <VerificationBadge size={16} />}
-                  </p>
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                   <span>{formatRelativeTime(post.createdAt)}</span>
@@ -1436,8 +1454,8 @@ function PostCard({
           {(isLiked || currentReaction) && (
             <div className="flex items-center gap-1.5 mt-2 mb-1">
               {isLiked && (
-                <span className="text-xs text-royal-blue font-medium flex items-center gap-1">
-                  <Heart className="w-3 h-3 fill-royal-blue" />
+                <span className="text-xs text-[#E0245E] font-medium flex items-center gap-1">
+                  <Heart className="w-3 h-3 fill-[#E0245E]" />
                   {likeCount}
                 </span>
               )}
@@ -1454,10 +1472,10 @@ function PostCard({
           <button
             type="button"
             onClick={handleLike}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${isLiked ? "text-royal-blue" : "text-muted-foreground hover:text-foreground"}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${isLiked ? "text-[#E0245E]" : "text-muted-foreground hover:text-foreground"}`}
             data-ocid={`like-btn-${postIdStr}`}
           >
-            <Heart className={`w-4 h-4 ${isLiked ? "fill-royal-blue" : ""}`} />
+            <Heart className={`w-4 h-4 ${isLiked ? "fill-[#E0245E]" : ""}`} />
             <span className="hidden sm:inline">
               {isLiked ? t.liked : t.like}
             </span>

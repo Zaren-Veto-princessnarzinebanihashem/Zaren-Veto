@@ -12,7 +12,8 @@ export const ADMIN_USERNAME = "Princess Narzine Bani Hashem";
 
 /** The two blue profile lines shown exclusively on the owner's profile — no duplicates, no extra words */
 export const OWNER_PROFILE_LINE1 = "Personnalité Publique";
-export const OWNER_PROFILE_LINE2 = "Fondatrice de l'application Zaren Veto";
+export const OWNER_PROFILE_LINE2 =
+  "Page officielle de la Fondatrice de l'application Zaren Veto";
 
 /**
  * Normalize a username for loose matching:

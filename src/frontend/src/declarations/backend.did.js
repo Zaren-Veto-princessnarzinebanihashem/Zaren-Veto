@@ -171,6 +171,10 @@ export const HashtagStat = IDL.Record({
   'postCount' : IDL.Nat,
   'hashtag' : IDL.Text,
 });
+export const LoginWithPasswordResult = IDL.Variant({
+  'ok' : IDL.Record({ 'userId' : UserId, 'profile' : UserProfile }),
+  'err' : IDL.Text,
+});
 export const ResolveAction = IDL.Variant({
   'banUser' : IDL.Null,
   'deleteContent' : IDL.Null,
@@ -268,6 +272,11 @@ export const idlService = IDL.Service({
   'loginWithPassword' : IDL.Func(
       [IDL.Text, IDL.Text],
       [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
+      [],
+    ),
+  'loginWithPasswordOnly' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [LoginWithPasswordResult],
       [],
     ),
   'markMessageRead' : IDL.Func([MessageId], [], []),
@@ -505,6 +514,10 @@ export const idlFactory = ({ IDL }) => {
     'postCount' : IDL.Nat,
     'hashtag' : IDL.Text,
   });
+  const LoginWithPasswordResult = IDL.Variant({
+    'ok' : IDL.Record({ 'userId' : UserId, 'profile' : UserProfile }),
+    'err' : IDL.Text,
+  });
   const ResolveAction = IDL.Variant({
     'banUser' : IDL.Null,
     'deleteContent' : IDL.Null,
@@ -618,6 +631,11 @@ export const idlFactory = ({ IDL }) => {
     'loginWithPassword' : IDL.Func(
         [IDL.Text, IDL.Text],
         [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
+        [],
+      ),
+    'loginWithPasswordOnly' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [LoginWithPasswordResult],
         [],
       ),
     'markMessageRead' : IDL.Func([MessageId], [], []),

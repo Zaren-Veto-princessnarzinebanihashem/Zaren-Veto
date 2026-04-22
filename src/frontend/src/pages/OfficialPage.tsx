@@ -134,26 +134,72 @@ function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
 
   const handleLike = () => {
     if (activeReaction) {
+      // Save previous state for revert
+      const prevReaction = activeReaction;
+      const prevLiked = liked;
+      const prevCount = likeCount;
+      // Optimistic update
       setActiveReaction(null);
       setLiked(false);
       setLikeCount((c) => Math.max(0, c - 1));
+      // Backend call — revert on error
+      if (actor) {
+        actor.unlikePost(post.id).catch(() => {
+          setActiveReaction(prevReaction);
+          setLiked(prevLiked);
+          setLikeCount(prevCount);
+        });
+      }
     } else {
+      const wasLiked = liked;
+      const prevCount = likeCount;
+      // Optimistic update
       setLiked((v) => !v);
-      setLikeCount((c) => (liked ? Math.max(0, c - 1) : c + 1));
+      setLikeCount((c) => (wasLiked ? Math.max(0, c - 1) : c + 1));
+      // Backend call — revert on error
+      if (actor) {
+        const call = wasLiked
+          ? actor.unlikePost(post.id)
+          : actor.likePost(post.id);
+        call.catch(() => {
+          setLiked(wasLiked);
+          setLikeCount(prevCount);
+        });
+      }
     }
     setShowReactions(false);
   };
 
   const handleReaction = (emoji: string, label: string) => {
+    const prevReaction = activeReaction;
+    const prevLiked = liked;
+    const prevCount = likeCount;
     if (activeReaction === emoji) {
+      // Remove reaction — optimistic update
       setActiveReaction(null);
       setLiked(false);
       setLikeCount((c) => Math.max(0, c - 1));
+      if (actor) {
+        actor.removeReaction(post.id).catch(() => {
+          setActiveReaction(prevReaction);
+          setLiked(prevLiked);
+          setLikeCount(prevCount);
+        });
+      }
     } else {
+      // Set reaction — optimistic update
       if (!activeReaction) setLikeCount((c) => c + 1);
       setActiveReaction(emoji);
       setLiked(true);
       toast.success(label);
+      // Backend call — revert on error
+      if (actor) {
+        actor.likePost(post.id).catch(() => {
+          setActiveReaction(prevReaction);
+          setLiked(prevLiked);
+          setLikeCount(prevCount);
+        });
+      }
     }
     setShowReactions(false);
   };
@@ -273,7 +319,7 @@ function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
             onMouseLeave={() => setTimeout(() => setShowReactions(false), 400)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${
               liked
-                ? "text-[#1877F2] font-semibold"
+                ? "text-[#E0245E] font-semibold"
                 : "text-muted-foreground hover:text-foreground"
             }`}
             data-ocid={`official-page.like_button.${index + 1}`}
@@ -282,7 +328,7 @@ function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
               <span className="text-base leading-none">{activeReaction}</span>
             ) : (
               <Heart
-                className={`w-4 h-4 ${liked ? "fill-[#1877F2] text-[#1877F2]" : ""}`}
+                className={`w-4 h-4 ${liked ? "fill-[#E0245E] text-[#E0245E]" : ""}`}
               />
             )}
             <span>
@@ -440,11 +486,16 @@ export default function OfficialPage() {
   const officialId = officialPage?.id?.toString() ?? null;
   const { data: posts, isLoading: postsLoading } = useOfficialPosts();
 
-  // Sync photos from backend profile — using separate state to decouple from owner's personal profile
+  // Sync photos from backend profile — using separate localStorage keys to decouple from owner's personal profile
   useEffect(() => {
-    if (officialPage?.coverPhotoUrl)
+    // Load from localStorage first (official page has its own keys)
+    const savedCover = localStorage.getItem("officialPage_cover");
+    const savedAvatar = localStorage.getItem("officialPage_avatar");
+    if (savedCover) setCoverPhotoUrl(savedCover);
+    else if (officialPage?.coverPhotoUrl)
       setCoverPhotoUrl(officialPage.coverPhotoUrl);
-    if (officialPage?.profilePhotoUrl)
+    if (savedAvatar) setProfilePhotoUrl(savedAvatar);
+    else if (officialPage?.profilePhotoUrl)
       setProfilePhotoUrl(officialPage.profilePhotoUrl);
   }, [officialPage?.coverPhotoUrl, officialPage?.profilePhotoUrl]);
 
@@ -458,7 +509,7 @@ export default function OfficialPage() {
     myProfile !== null &&
     isVerifiedUser(myProfile.username, myProfile.isVerified);
 
-  // ── Image uploads — official page has its own cover/profile stored via actor ──
+  // ── Image uploads — official page uses separate localStorage keys so they never affect the owner's personal profile ──
   const handleCoverFile = async (file: File) => {
     if (uploadingCover) return;
     setUploadingCover(true);
@@ -466,11 +517,8 @@ export default function OfficialPage() {
       const url = await uploadImage(file);
       if (!url) throw new Error("Upload returned empty URL");
       setCoverPhotoUrl(url);
-      // Update official page cover using the dedicated backend method when available;
-      // Currently falling back to updateCoverPhoto which updates the owner's profile.
-      if (actor && isOwner) {
-        await actor.updateCoverPhoto(url);
-      }
+      // Store under an official-page-specific key — completely independent of personal profile
+      localStorage.setItem("officialPage_cover", url);
       void queryClient.invalidateQueries({ queryKey: ["officialPage"] });
       toast.success(t.coverPhotoUpdated ?? "Photo de couverture mise à jour ✓");
     } catch (err) {
@@ -488,11 +536,8 @@ export default function OfficialPage() {
       const url = await uploadImage(file);
       if (!url) throw new Error("Upload returned empty URL");
       setProfilePhotoUrl(url);
-      // Update official page profile using the dedicated backend method when available;
-      // Currently falling back to updateProfilePhoto which updates the owner's profile.
-      if (actor && isOwner) {
-        await actor.updateProfilePhoto(url);
-      }
+      // Store under an official-page-specific key — completely independent of personal profile
+      localStorage.setItem("officialPage_avatar", url);
       void queryClient.invalidateQueries({ queryKey: ["officialPage"] });
       toast.success(t.profilePhotoUpdated ?? "Photo de profil mise à jour ✓");
     } catch (err) {
@@ -728,14 +773,10 @@ export default function OfficialPage() {
               <VerificationBadge size={22} />
             </h1>
 
-            {/* Bio — exactly 2 lines, royal blue, NO black text, NO duplicates */}
-            <div className="mt-1.5 space-y-0.5">
+            {/* Official page description — single label, NO "Personnalité Publique", NO long subtitle */}
+            <div className="mt-1.5">
               <p className="text-sm font-semibold" style={{ color: "#4169E1" }}>
-                Personnalité Publique
-              </p>
-              <p className="text-sm font-medium" style={{ color: "#4169E1" }}>
-                Page officielle de la Fondatrice de l&apos;application Zaren
-                Veto
+                Page officielle
               </p>
             </div>
 

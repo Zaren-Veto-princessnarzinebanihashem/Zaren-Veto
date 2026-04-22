@@ -486,6 +486,22 @@ export interface Translations {
   emailLabel: string;
   securityProtectionMsg: string;
   usernameReservedError: string;
+
+  // Password login (new)
+  loginWithPasswordTab: string;
+  loginWithIITab: string;
+  passwordLoginTitle: string;
+  passwordLoginSubtitle: string;
+  passwordLoginButton: string;
+  passwordLoginLoading: string;
+  passwordLoginWrongCredentials: string;
+  passwordLoginUsernameLabel: string;
+  passwordLoginUsernamePlaceholder: string;
+  notRegisteredYet: string;
+  registerLink: string;
+  backToLogin: string;
+  passwordRegisterTitle: string;
+  passwordRegisterSubtitle: string;
 }
 
 const en: Translations = {
@@ -1020,6 +1036,24 @@ const en: Translations = {
   securityProtectionMsg:
     "Your account is protected with a secure password. Only you can access it.",
   usernameReservedError: "This username is reserved and cannot be used.",
+
+  // Password login (new)
+  loginWithPasswordTab: "Login with Password",
+  loginWithIITab: "Internet Identity",
+  passwordLoginTitle: "Welcome back",
+  passwordLoginSubtitle:
+    "Sign in to your Zaren Veto account with your username and password.",
+  passwordLoginButton: "Login",
+  passwordLoginLoading: "Signing in…",
+  passwordLoginWrongCredentials:
+    "Incorrect username or password. Please try again.",
+  passwordLoginUsernameLabel: "Username",
+  passwordLoginUsernamePlaceholder: "Your username",
+  notRegisteredYet: "Not registered yet?",
+  registerLink: "Register",
+  backToLogin: "Back",
+  passwordRegisterTitle: "Create your account",
+  passwordRegisterSubtitle: "Join Zaren Veto — no Internet Identity required.",
 };
 
 const fr: Translations = {
@@ -1565,6 +1599,24 @@ const fr: Translations = {
     "Votre compte est protégé par un mot de passe sécurisé. Seul vous pouvez y accéder.",
   usernameReservedError:
     "Ce nom d'utilisateur est réservé et ne peut pas être utilisé.",
+
+  // Password login (new)
+  loginWithPasswordTab: "Se connecter avec mot de passe",
+  loginWithIITab: "Internet Identity",
+  passwordLoginTitle: "Bon retour",
+  passwordLoginSubtitle:
+    "Connectez-vous à votre compte Zaren Veto avec votre nom d'utilisateur et mot de passe.",
+  passwordLoginButton: "Connexion",
+  passwordLoginLoading: "Connexion en cours…",
+  passwordLoginWrongCredentials:
+    "Nom d'utilisateur ou mot de passe incorrect. Veuillez réessayer.",
+  passwordLoginUsernameLabel: "Nom d'utilisateur",
+  passwordLoginUsernamePlaceholder: "Votre nom d'utilisateur",
+  notRegisteredYet: "Pas encore inscrit ?",
+  registerLink: "S'inscrire",
+  backToLogin: "Retour",
+  passwordRegisterTitle: "Créez votre compte",
+  passwordRegisterSubtitle: "Rejoignez Zaren Veto — sans Internet Identity.",
 };
 
 const ar: Translations = {
@@ -2093,6 +2145,24 @@ const ar: Translations = {
   securityProtectionMsg:
     "حسابك محمي بكلمة مرور آمنة. أنت وحدك يمكنك الوصول إليه.",
   usernameReservedError: "اسم المستخدم هذا محجوز ولا يمكن استخدامه.",
+
+  // Password login (new)
+  loginWithPasswordTab: "تسجيل الدخول بكلمة السر",
+  loginWithIITab: "هوية الإنترنت",
+  passwordLoginTitle: "مرحبًا بعودتك",
+  passwordLoginSubtitle:
+    "ادخل إلى حسابك على زارن فيتو باسم المستخدم وكلمة السر.",
+  passwordLoginButton: "دخول",
+  passwordLoginLoading: "جارٍ تسجيل الدخول…",
+  passwordLoginWrongCredentials:
+    "اسم المستخدم أو كلمة السر غير صحيحة. يرجى المحاولة مجددًا.",
+  passwordLoginUsernameLabel: "اسم المستخدم",
+  passwordLoginUsernamePlaceholder: "اسم المستخدم الخاص بك",
+  notRegisteredYet: "لم تسجل بعد؟",
+  registerLink: "تسجيل",
+  backToLogin: "رجوع",
+  passwordRegisterTitle: "أنشئ حسابك",
+  passwordRegisterSubtitle: "انضم إلى زارن فيتو — بدون هوية الإنترنت.",
 };
 
 export const translations: Record<Language, Translations> = { en, fr, ar };

@@ -8,9 +8,9 @@ import NewTypes "types/stories-hashtags-friendrequests-polls-admin";
 import UPMApi "mixins/users-posts-messages-api";
 import EngApi "mixins/engagement-api";
 import NewApi "mixins/stories-hashtags-friendrequests-polls-admin-api";
-import Migration "migration";
 
-(with migration = Migration.run)
+
+
 actor {
   // ─── Users / Posts / Messages state ──────────────────────────────────────
   let users         : Map.Map<Common.UserId, Types.User>                   = Map.empty();

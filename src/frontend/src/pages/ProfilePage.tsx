@@ -13,11 +13,7 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { CommentView, PostView, UserProfile } from "@/types";
 import { ReactionType, Visibility } from "@/types";
-import {
-  OWNER_PROFILE_LINE1,
-  OWNER_PROFILE_LINE2,
-  isVerifiedUser,
-} from "@/utils/verification";
+import { isVerifiedUser } from "@/utils/verification";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
@@ -316,8 +312,12 @@ interface AboutSectionProps {
 }
 
 function AboutSection({ profile, isOwnProfile }: AboutSectionProps) {
+  const isOwnerVerified = isVerifiedUser(profile.username, profile.isVerified);
   const [editing, setEditing] = useState(false);
-  const [bio, setBio] = useState(profile.aboutBio ?? "");
+  // For the verified owner, never show aboutBio (the two hardcoded blue lines are the canonical text)
+  const [bio, setBio] = useState(
+    isOwnerVerified ? "" : (profile.aboutBio ?? ""),
+  );
   const [location, setLocation] = useState(profile.aboutLocation ?? "");
   const [work, setWork] = useState(profile.aboutWork ?? "");
   const [education, setEducation] = useState(profile.aboutEducation ?? "");
@@ -483,7 +483,7 @@ function AboutSection({ profile, isOwnProfile }: AboutSectionProps) {
         </form>
       ) : (
         <div className="space-y-2.5">
-          {profile.aboutBio && (
+          {profile.aboutBio && !isOwnerVerified && (
             <p className="text-sm text-muted-foreground leading-relaxed">
               {profile.aboutBio}
             </p>
@@ -715,14 +715,14 @@ function ProfileHero({
             <VisibilityBadge visibility={profile.visibility} />
           </div>
 
-          {/* User bio — only show if set AND NOT the owner (owner has the 2 fixed lines instead) */}
+          {/* User bio — only show if set AND NOT the owner (owner has 2 fixed blue lines instead) */}
           {profile.bio && !isVerified && (
             <p className="text-sm text-muted-foreground leading-relaxed max-w-lg break-words">
               {profile.bio}
             </p>
           )}
 
-          {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates, no gray/black text */}
+          {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates ever */}
           {isVerified && (
             <div
               className="mt-1 flex flex-col gap-0.5"
@@ -732,13 +732,14 @@ function ProfileHero({
                 className="text-sm font-semibold leading-snug"
                 style={{ color: "#4169E1" }}
               >
-                {OWNER_PROFILE_LINE1}
+                Personnalité Publique
               </p>
               <p
                 className="text-sm font-medium leading-snug"
                 style={{ color: "#4169E1" }}
               >
-                {OWNER_PROFILE_LINE2}
+                Page officielle de la Fondatrice de l&apos;application Zaren
+                Veto
               </p>
             </div>
           )}
@@ -1204,10 +1205,10 @@ function PostCard({
         <button
           type="button"
           onClick={handleLike}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${isLiked ? "text-red-500" : "text-muted-foreground hover:text-foreground"}`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-smooth hover:bg-secondary ${isLiked ? "text-[#E0245E]" : "text-muted-foreground hover:text-foreground"}`}
           data-ocid={`profile.post_like.${index + 1}`}
         >
-          <Heart className={`w-4 h-4 ${isLiked ? "fill-red-500" : ""}`} />
+          <Heart className={`w-4 h-4 ${isLiked ? "fill-[#E0245E]" : ""}`} />
           <span className="hidden sm:inline">{isLiked ? t.liked : t.like}</span>
           {likeCount > 0 && <span className="tabular-nums">{likeCount}</span>}
         </button>
@@ -1822,7 +1823,7 @@ export default function ProfilePage() {
             actionSlot={actionSlot}
             isVerified={isVerified}
             followerCount={isVerified ? "19k" : userProfile.followerCount}
-            showOfficialPageLink={isVerified && isOwnProfile}
+            showOfficialPageLink={isVerified}
           />
           {isOwnProfile && editing && (
             <div className="bg-card border border-border border-t-0 rounded-b-xl px-6 pb-6">

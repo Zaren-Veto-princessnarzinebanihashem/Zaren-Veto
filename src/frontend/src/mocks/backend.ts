@@ -211,6 +211,7 @@ export const mockBackend: backendInterface = {
   // Security methods
   getMyEmail: async () => null,
   loginWithPassword: async () => ({ __kind__: "ok" as const, ok: mockUserProfile }),
+  loginWithPasswordOnly: async () => ({ __kind__: "ok" as const, ok: { userId: samplePrincipal, profile: mockUserProfile } }),
   updateEmail: async () => true,
   updateOfficialPageCoverPhoto: async (_url: string) => ({ ok: null } as any),
   updateOfficialPageProfilePhoto: async (_url: string) => ({ ok: null } as any),

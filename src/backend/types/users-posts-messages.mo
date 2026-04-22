@@ -108,6 +108,12 @@ module {
     readAt           : ?Common.Timestamp;
   };
 
+  // Result type for loginWithPasswordOnly — includes userId so frontend can track session
+  public type LoginWithPasswordResult = {
+    #ok  : { profile : UserProfile; userId : Common.UserId };
+    #err : Text;
+  };
+
   // Conversation summary for list view
   public type ConversationSummary = {
     conversationId    : Common.ConversationId;

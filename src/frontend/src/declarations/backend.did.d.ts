@@ -47,6 +47,10 @@ export interface FriendRequestView {
   'createdAt' : Timestamp,
 }
 export interface HashtagStat { 'postCount' : bigint, 'hashtag' : string }
+export type LoginWithPasswordResult = {
+    'ok' : { 'userId' : UserId, 'profile' : UserProfile }
+  } |
+  { 'err' : string };
 export type MessageId = bigint;
 export interface MessageReactionView {
   'reactor' : UserProfile,
@@ -241,6 +245,10 @@ export interface _SERVICE {
     [string, string],
     { 'ok' : UserProfile } |
       { 'err' : string }
+  >,
+  'loginWithPasswordOnly' : ActorMethod<
+    [string, string],
+    LoginWithPasswordResult
   >,
   'markMessageRead' : ActorMethod<[MessageId], undefined>,
   'markNotificationsRead' : ActorMethod<[], undefined>,

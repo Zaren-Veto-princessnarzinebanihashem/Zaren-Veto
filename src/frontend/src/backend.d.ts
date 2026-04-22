@@ -77,8 +77,18 @@ export interface HashtagStat {
     postCount: bigint;
     hashtag: string;
 }
-export type CommentId = bigint;
+export type LoginWithPasswordResult = {
+    __kind__: "ok";
+    ok: {
+        userId: UserId;
+        profile: UserProfile;
+    };
+} | {
+    __kind__: "err";
+    err: string;
+};
 export type FriendRequestId = bigint;
+export type CommentId = bigint;
 export interface FriendRequestView {
     id: FriendRequestId;
     to: UserProfile;
@@ -289,6 +299,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    loginWithPasswordOnly(username: string, password: string): Promise<LoginWithPasswordResult>;
     markMessageRead(messageId: MessageId): Promise<void>;
     markNotificationsRead(): Promise<void>;
     pinPost(postId: PostId): Promise<boolean>;

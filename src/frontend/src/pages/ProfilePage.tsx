@@ -13,7 +13,11 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { CommentView, PostView, UserProfile } from "@/types";
 import { ReactionType, Visibility } from "@/types";
-import { isVerifiedUser } from "@/utils/verification";
+import {
+  OWNER_PROFILE_LINE1,
+  OWNER_PROFILE_LINE2,
+  isVerifiedUser,
+} from "@/utils/verification";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
@@ -483,11 +487,13 @@ function AboutSection({ profile, isOwnProfile }: AboutSectionProps) {
         </form>
       ) : (
         <div className="space-y-2.5">
-          {profile.aboutBio && !isOwnerVerified && (
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {profile.aboutBio}
-            </p>
-          )}
+          {profile.aboutBio &&
+            !isOwnerVerified &&
+            !isVerifiedUser(profile.username, profile.isVerified) && (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {profile.aboutBio}
+              </p>
+            )}
           {profile.aboutWork && (
             <div className="flex items-center gap-2 text-sm text-foreground">
               <Briefcase className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -716,11 +722,13 @@ function ProfileHero({
           </div>
 
           {/* User bio — only show if set AND NOT the owner (owner has 2 fixed blue lines instead) */}
-          {profile.bio && !isVerified && (
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-lg break-words">
-              {profile.bio}
-            </p>
-          )}
+          {profile.bio &&
+            !isVerified &&
+            !isVerifiedUser(profile.username, profile.isVerified) && (
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-lg break-words">
+                {profile.bio}
+              </p>
+            )}
 
           {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates ever */}
           {isVerified && (
@@ -732,14 +740,13 @@ function ProfileHero({
                 className="text-sm font-semibold leading-snug"
                 style={{ color: "#4169E1" }}
               >
-                Personnalité Publique
+                {OWNER_PROFILE_LINE1}
               </p>
               <p
                 className="text-sm font-medium leading-snug"
                 style={{ color: "#4169E1" }}
               >
-                Page officielle de la Fondatrice de l&apos;application Zaren
-                Veto
+                {OWNER_PROFILE_LINE2}
               </p>
             </div>
           )}

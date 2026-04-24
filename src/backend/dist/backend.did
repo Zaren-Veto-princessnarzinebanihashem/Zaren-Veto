@@ -309,6 +309,10 @@ service : {
   searchUsers: (term: text) -> (vec UserProfile) query;
   sendFriendRequest: (to: UserId) -> (bool);
   sendMessage: (recipient: UserId, encryptedContent: blob) -> (MessageId);
+  setMyPassword: (newPassword: text) -> (variant {
+                                           err: text;
+                                           ok: bool;
+                                         });
   sharePost: (postId: PostId) -> ();
   suspendUser: (userId: UserId, durationHours: nat) -> (bool);
   unblockUser: (userId: UserId) -> ();

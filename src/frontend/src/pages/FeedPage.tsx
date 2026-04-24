@@ -131,7 +131,11 @@ function useCreatePost() {
       return postId;
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["feed"] });
+      // Defer invalidation one tick so React finishes any in-flight state updates
+      // before the query refetch triggers a re-render, preventing insertBefore/removeChild errors
+      setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ["feed"] });
+      }, 0);
       toast.success(t.postPublished);
     },
     onError: (err: unknown) => {
@@ -156,7 +160,9 @@ function useEditPost() {
       return result;
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["feed"] });
+      setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ["feed"] });
+      }, 0);
       toast.success(t.postUpdated);
     },
     onError: (err: unknown) => {
@@ -176,7 +182,9 @@ function useDeletePost() {
       return actor.deletePost(postId);
     },
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["feed"] });
+      setTimeout(() => {
+        void qc.invalidateQueries({ queryKey: ["feed"] });
+      }, 0);
       toast.success(t.postDeleted);
     },
     onError: () => toast.error(t.failedToDeletePost),
@@ -929,14 +937,90 @@ function ShareDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  const handleCopyLink = () => {
-    void navigator.clipboard.writeText(
-      `${window.location.origin}/post/${postIdStr}`,
-    );
-    toast.success(t.linkCopied);
+  const postUrl = `${window.location.origin}/post/${postIdStr}`;
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "Zaren Veto",
+          url: postUrl,
+        });
+      } catch {
+        // User cancelled or share failed — silently ignore
+      }
+    }
     onClose();
   };
 
+  const handleCopyLink = () => {
+    const doCopy = () => {
+      try {
+        const el = document.createElement("textarea");
+        el.value = postUrl;
+        el.style.cssText = "position:fixed;opacity:0;top:0;left:0;";
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand("copy");
+        document.body.removeChild(el);
+        toast.success(t.linkCopied);
+      } catch {
+        toast.error(t.actionFailed);
+      }
+    };
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(postUrl)
+        .then(() => toast.success(t.linkCopied))
+        .catch(doCopy);
+    } else {
+      doCopy();
+    }
+    onClose();
+  };
+
+  const encodedUrl = encodeURIComponent(postUrl);
+  const hasNativeShare =
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  // If native share is available (mobile), use it directly instead of dropdown
+  if (hasNativeShare) {
+    return (
+      <motion.div
+        ref={ref}
+        initial={{ opacity: 0, scale: 0.9, y: -4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: -4 }}
+        transition={{ duration: 0.12 }}
+        className="absolute bottom-full mb-2 end-0 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-30 w-48"
+        data-ocid={`share-dropdown-${postIdStr}`}
+      >
+        <button
+          type="button"
+          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-smooth"
+          onClick={() => void handleNativeShare()}
+          aria-label="Share this post"
+          data-ocid={`share-native-${postIdStr}`}
+        >
+          <Share2 className="w-4 h-4 text-muted-foreground" />
+          {t.share}
+        </button>
+        <button
+          type="button"
+          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-smooth border-t border-border"
+          onClick={handleCopyLink}
+          aria-label="Copy link"
+          data-ocid={`copy-link-${postIdStr}`}
+        >
+          <Link2 className="w-4 h-4 text-muted-foreground" />
+          {t.copyLink}
+        </button>
+      </motion.div>
+    );
+  }
+
+  // Desktop: show social share options + copy link
   return (
     <motion.div
       ref={ref}
@@ -944,7 +1028,7 @@ function ShareDropdown({
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9, y: -4 }}
       transition={{ duration: 0.12 }}
-      className="absolute bottom-full mb-2 end-0 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-30 w-44"
+      className="absolute bottom-full mb-2 end-0 bg-card border border-border rounded-xl shadow-xl overflow-hidden z-30 w-52"
       data-ocid={`share-dropdown-${postIdStr}`}
     >
       <button
@@ -954,15 +1038,45 @@ function ShareDropdown({
           onShare();
           onClose();
         }}
+        aria-label="Share to feed"
         data-ocid={`share-to-feed-${postIdStr}`}
       >
         <Share2 className="w-4 h-4 text-muted-foreground" />
         {t.shareToFeed}
       </button>
+      <a
+        href={`https://wa.me/?text=${encodedUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-smooth border-t border-border"
+        aria-label="Share on WhatsApp"
+        data-ocid={`share-whatsapp-${postIdStr}`}
+        onClick={onClose}
+      >
+        <span className="w-4 h-4 text-[#25D366] flex items-center justify-center font-bold text-xs">
+          W
+        </span>
+        WhatsApp
+      </a>
+      <a
+        href={`https://t.me/share/url?url=${encodedUrl}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-smooth border-t border-border"
+        aria-label="Share on Telegram"
+        data-ocid={`share-telegram-${postIdStr}`}
+        onClick={onClose}
+      >
+        <span className="w-4 h-4 text-[#229ED9] flex items-center justify-center font-bold text-xs">
+          T
+        </span>
+        Telegram
+      </a>
       <button
         type="button"
         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-secondary transition-smooth border-t border-border"
         onClick={handleCopyLink}
+        aria-label="Copy link"
         data-ocid={`copy-link-${postIdStr}`}
       >
         <Link2 className="w-4 h-4 text-muted-foreground" />

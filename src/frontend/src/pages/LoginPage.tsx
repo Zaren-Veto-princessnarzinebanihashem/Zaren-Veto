@@ -68,7 +68,7 @@ function PasswordLoginForm({ onShowRegister }: { onShowRegister: () => void }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, language } = useLanguage();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +79,31 @@ function PasswordLoginForm({ onShowRegister }: { onShowRegister: () => void }) {
       await loginWithPassword({ username: username.trim(), password });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      setError(msg || t.passwordLoginWrongCredentials);
+      // Provide user-friendly messages for common error patterns
+      if (
+        msg.includes("IC0508") ||
+        msg.includes("canister") ||
+        msg.includes("503") ||
+        msg.includes("unavailable")
+      ) {
+        setError(
+          language === "ar"
+            ? "الخادم غير متاح حالياً، يرجى المحاولة مجدداً بعد لحظات"
+            : language === "fr"
+              ? "Le serveur est temporairement indisponible. Réessayez dans quelques instants."
+              : "Server temporarily unavailable. Please try again in a moment.",
+        );
+      } else if (
+        msg.includes("wrong") ||
+        msg.includes("incorrect") ||
+        msg.includes("invalid") ||
+        msg.includes("not found") ||
+        msg.includes("introuvable")
+      ) {
+        setError(t.passwordLoginWrongCredentials);
+      } else {
+        setError(msg || t.passwordLoginWrongCredentials);
+      }
     }
   };
 
@@ -165,13 +189,20 @@ function PasswordLoginForm({ onShowRegister }: { onShowRegister: () => void }) {
 
         {/* Error */}
         {error && (
-          <p
-            className="text-xs text-destructive flex items-center gap-1.5 p-2 rounded-lg bg-destructive/10 border border-destructive/20"
+          <div
+            className="text-xs text-destructive p-3 rounded-lg bg-destructive/10 border border-destructive/20 space-y-1.5"
             data-ocid="password-login.error_state"
           >
-            <X className="w-3.5 h-3.5 shrink-0" />
-            {error}
-          </p>
+            <p className="flex items-center gap-1.5 font-medium">
+              <X className="w-3.5 h-3.5 shrink-0" />
+              {error}
+            </p>
+            <p className="text-muted-foreground text-[11px] leading-relaxed pl-5">
+              Si vous n&apos;avez pas de mot de passe, utilisez l&apos;onglet{" "}
+              <strong className="text-foreground">Internet Identity</strong>{" "}
+              pour vous connecter.
+            </p>
+          </div>
         )}
 
         <Button

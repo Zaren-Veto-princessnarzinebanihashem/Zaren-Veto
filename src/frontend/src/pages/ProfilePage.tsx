@@ -16,6 +16,7 @@ import { ReactionType, Visibility } from "@/types";
 import {
   OWNER_PROFILE_LINE1,
   OWNER_PROFILE_LINE2,
+  isOwnerProfile,
   isVerifiedUser,
 } from "@/utils/verification";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -316,12 +317,10 @@ interface AboutSectionProps {
 }
 
 function AboutSection({ profile, isOwnProfile }: AboutSectionProps) {
-  const isOwnerVerified = isVerifiedUser(profile.username, profile.isVerified);
+  const isOwner = isOwnerProfile(profile.username, profile.isVerified);
   const [editing, setEditing] = useState(false);
-  // For the verified owner, never show aboutBio (the two hardcoded blue lines are the canonical text)
-  const [bio, setBio] = useState(
-    isOwnerVerified ? "" : (profile.aboutBio ?? ""),
-  );
+  // For the owner, never pre-populate aboutBio — the two hardcoded blue lines are canonical
+  const [bio, setBio] = useState(isOwner ? "" : (profile.aboutBio ?? ""));
   const [location, setLocation] = useState(profile.aboutLocation ?? "");
   const [work, setWork] = useState(profile.aboutWork ?? "");
   const [education, setEducation] = useState(profile.aboutEducation ?? "");
@@ -330,12 +329,22 @@ function AboutSection({ profile, isOwnProfile }: AboutSectionProps) {
   const { actor } = useAuthenticatedBackend();
   const { t } = useLanguage();
 
-  const hasInfo =
-    profile.aboutBio ||
-    profile.aboutLocation ||
-    profile.aboutWork ||
-    profile.aboutEducation ||
-    profile.aboutWebsite;
+  // For the owner: aboutBio is excluded from hasInfo so it doesn't trigger an
+  // "About" section that would render the bio text underneath the blue lines
+  const hasInfo = isOwner
+    ? !!(
+        profile.aboutLocation ||
+        profile.aboutWork ||
+        profile.aboutEducation ||
+        profile.aboutWebsite
+      )
+    : !!(
+        profile.aboutBio ||
+        profile.aboutLocation ||
+        profile.aboutWork ||
+        profile.aboutEducation ||
+        profile.aboutWebsite
+      );
 
   if (!hasInfo && !isOwnProfile) return null;
 
@@ -488,8 +497,7 @@ function AboutSection({ profile, isOwnProfile }: AboutSectionProps) {
       ) : (
         <div className="space-y-2.5">
           {profile.aboutBio &&
-            !isOwnerVerified &&
-            !isVerifiedUser(profile.username, profile.isVerified) && (
+            !isOwnerProfile(profile.username, profile.isVerified) && (
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {profile.aboutBio}
               </p>
@@ -721,17 +729,18 @@ function ProfileHero({
             <VisibilityBadge visibility={profile.visibility} />
           </div>
 
-          {/* User bio — only show if set AND NOT the owner (owner has 2 fixed blue lines instead) */}
+          {/* User bio — NEVER rendered for the owner (owner gets exactly 2 fixed blue lines below) */}
           {profile.bio &&
-            !isVerified &&
-            !isVerifiedUser(profile.username, profile.isVerified) && (
+            !isOwnerProfile(profile.username, profile.isVerified) && (
               <p className="text-sm text-muted-foreground leading-relaxed max-w-lg break-words">
                 {profile.bio}
               </p>
             )}
 
-          {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates ever */}
-          {isVerified && (
+          {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates ever.
+              isOwnerProfile covers both username-match and backend isVerified flag.
+              profile.bio is intentionally NOT rendered here to prevent any duplication. */}
+          {isOwnerProfile(profile.username, profile.isVerified) && (
             <div
               className="mt-1 flex flex-col gap-0.5"
               data-ocid="profile.owner_bio_lines"
@@ -1103,10 +1112,24 @@ function PostCard({
 
   const handleShare = () => {
     const postId = post.id != null ? post.id.toString() : "";
-    void navigator.clipboard
-      .writeText(`${window.location.origin}/post/${postId}`)
-      .then(() => toast.success(t.linkCopied))
-      .catch(() => toast.error(t.actionFailed));
+    const postUrl = `${window.location.origin}/post/${postId}`;
+    const encodedUrl = encodeURIComponent(postUrl);
+    const hasNativeShare =
+      typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+    if (hasNativeShare) {
+      void navigator.share({ title: "Zaren Veto", url: postUrl }).catch(() => {
+        /* user cancelled */
+      });
+      return;
+    }
+
+    // Desktop fallback: open WhatsApp share
+    window.open(
+      `https://wa.me/?text=${encodedUrl}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   return (

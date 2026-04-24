@@ -188,14 +188,10 @@ module {
     let postCount = posts.filter(func(p : Types.Post) : Bool { p.authorId == user.id }).size();
     // Owner account always shows 19k followers
     let followerCount = if (user.username == "Princess Narzine Bani Hashem") 19000 else followers.size();
-    // Owner profile bio lines
-    let displayBio = if (user.username == "Princess Narzine Bani Hashem")
-      "Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto"
-    else user.bio;
     {
       id             = user.id;
       username       = user.username;
-      bio            = displayBio;
+      bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
       visibility     = user.visibility;
       postCount;
       followerCount;
@@ -204,7 +200,7 @@ module {
       coverPhotoUrl   = user.coverPhotoUrl;
       isVerified      = user.isVerified;
       isOfficialPage  = false;
-      aboutBio        = if (user.username == "Princess Narzine Bani Hashem") ?"Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto" else user.aboutBio;
+      aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
       aboutLocation   = user.aboutLocation;
       aboutWork       = user.aboutWork;
       aboutEducation  = user.aboutEducation;

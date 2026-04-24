@@ -215,6 +215,7 @@ export const mockBackend: backendInterface = {
   updateEmail: async () => true,
   updateOfficialPageCoverPhoto: async (_url: string) => ({ ok: null } as any),
   updateOfficialPageProfilePhoto: async (_url: string) => ({ ok: null } as any),
+  setMyPassword: async () => ({ __kind__: "ok" as const, ok: true }),
 };
 
 // Suppress unused import warning

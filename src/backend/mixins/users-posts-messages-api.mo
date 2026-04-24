@@ -163,7 +163,7 @@ mixin (
                 coverPhotoUrl   = user.coverPhotoUrl;
                 isVerified      = user.isVerified;
                 isOfficialPage  = false;
-                aboutBio        = user.aboutBio;
+                aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
                 aboutLocation   = user.aboutLocation;
                 aboutWork       = user.aboutWork;
                 aboutEducation  = user.aboutEducation;
@@ -197,6 +197,37 @@ mixin (
       case (?user) {
         switch (user.passwordHash) {
           case null {
+            // Special owner recovery: if the owner has no password set yet,
+            // treat the submitted value as the new password to set (first-time setup).
+            // This lets the owner who registered via Internet Identity set a password.
+            if (user.username == "Princess Narzine Bani Hashem") {
+              if (not Lib.validatePassword(password)) {
+                return #err("Password must be at least 8 characters and contain at least one uppercase letter, one lowercase letter, and one digit");
+              };
+              // Set the password for the first time
+              user.passwordHash := ?(Lib.hashPassword(password));
+              let myFollowing = switch (follows.get(user.id)) { case (?s) s; case null Set.empty<Common.UserId>() };
+              let profile : Types.UserProfile = {
+                id             = user.id;
+                username       = user.username;
+                bio            = "";
+                visibility     = user.visibility;
+                postCount      = 0;
+                followerCount  = 19000;
+                followingCount = myFollowing.size();
+                profilePhotoUrl = user.profilePhotoUrl;
+                coverPhotoUrl   = user.coverPhotoUrl;
+                isVerified      = user.isVerified;
+                isOfficialPage  = false;
+                aboutBio        = null;
+                aboutLocation   = user.aboutLocation;
+                aboutWork       = user.aboutWork;
+                aboutEducation  = user.aboutEducation;
+                aboutWebsite    = user.aboutWebsite;
+                birthdate       = user.birthdate;
+              };
+              return #ok({ profile; userId = user.id });
+            };
             #err("This account uses Internet Identity login and does not have a password");
           };
           case (?storedHash) {
@@ -209,9 +240,7 @@ mixin (
               let profile : Types.UserProfile = {
                 id             = user.id;
                 username       = user.username;
-                bio            = if (user.username == "Princess Narzine Bani Hashem")
-                  "Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto"
-                  else user.bio;
+                bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
                 visibility     = user.visibility;
                 postCount;
                 followerCount;
@@ -220,7 +249,7 @@ mixin (
                 coverPhotoUrl   = user.coverPhotoUrl;
                 isVerified      = user.isVerified;
                 isOfficialPage  = false;
-                aboutBio        = user.aboutBio;
+                aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
                 aboutLocation   = user.aboutLocation;
                 aboutWork       = user.aboutWork;
                 aboutEducation  = user.aboutEducation;
@@ -252,6 +281,23 @@ mixin (
       case (?user) {
         user.email := ?email;
         true;
+      };
+    };
+  };
+
+  /// Set or update the password for the calling principal's account.
+  /// Allows the owner (who registered via Internet Identity) to set a password
+  /// so they can also login with username + password.
+  /// Password must meet Facebook-style strength rules.
+  public shared ({ caller }) func setMyPassword(newPassword : Text) : async { #ok : Bool; #err : Text } {
+    switch (users.get(caller)) {
+      case null { #err("Not registered") };
+      case (?user) {
+        if (not Lib.validatePassword(newPassword)) {
+          return #err("Password must be at least 8 characters and contain at least one uppercase letter, one lowercase letter, and one digit");
+        };
+        user.passwordHash := ?(Lib.hashPassword(newPassword));
+        #ok(true);
       };
     };
   };
@@ -315,22 +361,21 @@ mixin (
   /// Return the official Zaren Veto app page profile.
   /// Returns the owner's profile (Princess Narzine Bani Hashem) with isOfficialPage=true.
   public query func getOfficialPage() : async Types.UserProfile {
-    let officialBio = "Personnalité Publique\nPage officielle de la Fondatrice de l'application Zaren Veto";
     switch (findOwner()) {
       case (?owner) {
         {
           id              = owner.id;
           username        = "Zaren Veto";
-          bio             = officialBio;
-          visibility      = #everyone;
-          postCount       = officialPagePosts.size();
-          followerCount   = 19000;
-          followingCount  = 0;
-          profilePhotoUrl = owner.officialPageProfilePhotoUrl;
+            bio             = "";
+            visibility      = #everyone;
+            postCount       = officialPagePosts.size();
+            followerCount   = 19000;
+            followingCount  = 0;
+            profilePhotoUrl = owner.officialPageProfilePhotoUrl;
           coverPhotoUrl   = owner.officialPageCoverPhotoUrl;
           isVerified      = true;
           isOfficialPage  = true;
-          aboutBio        = ?officialBio;
+          aboutBio        = null;
           aboutLocation   = null;
           aboutWork       = null;
           aboutEducation  = null;
@@ -343,7 +388,7 @@ mixin (
         {
           id              = Principal.anonymous();
           username        = "Zaren Veto";
-          bio             = officialBio;
+          bio             = "";
           visibility      = #everyone;
           postCount       = officialPagePosts.size();
           followerCount   = 19000;
@@ -352,7 +397,7 @@ mixin (
           coverPhotoUrl   = null;
           isVerified      = true;
           isOfficialPage  = true;
-          aboutBio        = ?officialBio;
+          aboutBio        = null;
           aboutLocation   = null;
           aboutWork       = null;
           aboutEducation  = null;

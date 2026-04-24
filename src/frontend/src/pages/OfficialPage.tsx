@@ -206,11 +206,25 @@ function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
 
   const handleShare = () => {
     const url = `${window.location.origin}/official-page`;
-    if (navigator.clipboard?.writeText) {
-      void navigator.clipboard
-        .writeText(url)
-        .then(() => toast.success(t.linkCopied));
+    const encodedUrl = encodeURIComponent(url);
+    const hasNativeShare =
+      typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+    if (hasNativeShare) {
+      void navigator
+        .share({ title: "Zaren Veto — Page officielle", url })
+        .catch(() => {
+          /* user cancelled */
+        });
+      return;
     }
+
+    // Desktop fallback: open WhatsApp share
+    window.open(
+      `https://wa.me/?text=${encodedUrl}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
   };
 
   const handleSubmitComment = async (e: React.FormEvent) => {

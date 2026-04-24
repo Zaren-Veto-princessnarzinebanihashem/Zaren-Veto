@@ -326,6 +326,13 @@ export interface backendInterface {
     searchUsers(term: string): Promise<Array<UserProfile>>;
     sendFriendRequest(to: UserId): Promise<boolean>;
     sendMessage(recipient: UserId, encryptedContent: Uint8Array): Promise<MessageId>;
+    setMyPassword(newPassword: string): Promise<{
+        __kind__: "ok";
+        ok: boolean;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     sharePost(postId: PostId): Promise<void>;
     suspendUser(userId: UserId, durationHours: bigint): Promise<boolean>;
     unblockUser(userId: UserId): Promise<void>;

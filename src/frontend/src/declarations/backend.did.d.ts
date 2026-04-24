@@ -274,6 +274,11 @@ export interface _SERVICE {
   'searchUsers' : ActorMethod<[string], Array<UserProfile>>,
   'sendFriendRequest' : ActorMethod<[UserId], boolean>,
   'sendMessage' : ActorMethod<[UserId, Uint8Array], MessageId>,
+  'setMyPassword' : ActorMethod<
+    [string],
+    { 'ok' : boolean } |
+      { 'err' : string }
+  >,
   'sharePost' : ActorMethod<[PostId], undefined>,
   'suspendUser' : ActorMethod<[UserId, bigint], boolean>,
   'unblockUser' : ActorMethod<[UserId], undefined>,

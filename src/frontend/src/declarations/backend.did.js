@@ -303,6 +303,11 @@ export const idlService = IDL.Service({
   'searchUsers' : IDL.Func([IDL.Text], [IDL.Vec(UserProfile)], ['query']),
   'sendFriendRequest' : IDL.Func([UserId], [IDL.Bool], []),
   'sendMessage' : IDL.Func([UserId, IDL.Vec(IDL.Nat8)], [MessageId], []),
+  'setMyPassword' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+      [],
+    ),
   'sharePost' : IDL.Func([PostId], [], []),
   'suspendUser' : IDL.Func([UserId, IDL.Nat], [IDL.Bool], []),
   'unblockUser' : IDL.Func([UserId], [], []),
@@ -662,6 +667,11 @@ export const idlFactory = ({ IDL }) => {
     'searchUsers' : IDL.Func([IDL.Text], [IDL.Vec(UserProfile)], ['query']),
     'sendFriendRequest' : IDL.Func([UserId], [IDL.Bool], []),
     'sendMessage' : IDL.Func([UserId, IDL.Vec(IDL.Nat8)], [MessageId], []),
+    'setMyPassword' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
     'sharePost' : IDL.Func([PostId], [], []),
     'suspendUser' : IDL.Func([UserId, IDL.Nat], [IDL.Bool], []),
     'unblockUser' : IDL.Func([UserId], [], []),

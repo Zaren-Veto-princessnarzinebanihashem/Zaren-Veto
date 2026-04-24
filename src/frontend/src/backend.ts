@@ -408,6 +408,13 @@ export interface backendInterface {
     searchUsers(term: string): Promise<Array<UserProfile>>;
     sendFriendRequest(to: UserId): Promise<boolean>;
     sendMessage(recipient: UserId, encryptedContent: Uint8Array): Promise<MessageId>;
+    setMyPassword(newPassword: string): Promise<{
+        __kind__: "ok";
+        ok: boolean;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     sharePost(postId: PostId): Promise<void>;
     suspendUser(userId: UserId, durationHours: bigint): Promise<boolean>;
     unblockUser(userId: UserId): Promise<void>;
@@ -1525,6 +1532,26 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.sendMessage(arg0, arg1);
             return result;
+        }
+    }
+    async setMyPassword(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: boolean;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setMyPassword(arg0);
+                return from_candid_variant_n59(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setMyPassword(arg0);
+            return from_candid_variant_n59(this._uploadFile, this._downloadFile, result);
         }
     }
     async sharePost(arg0: PostId): Promise<void> {

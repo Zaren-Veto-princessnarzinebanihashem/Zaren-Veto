@@ -33,6 +33,39 @@ import { toast } from "sonner";
 const AVATAR_SIZE = 112; // px — diameter of the circular profile photo
 const AVATAR_HALF = AVATAR_SIZE / 2; // 56px — how far it overlaps below cover
 
+/** Renders post content with clickable blue URLs */
+function renderPostContent(content: string): React.ReactNode {
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const matches = Array.from(
+    content.matchAll(new RegExp(urlRegex.source, "g")),
+  );
+  if (matches.length === 0) return content;
+  const segments: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of matches) {
+    const url = match[0];
+    const start = match.index ?? 0;
+    const before = content.slice(lastIndex, start);
+    if (before) segments.push(before);
+    segments.push(
+      <a
+        key={start}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[#1877F2] underline hover:text-blue-400 break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>,
+    );
+    lastIndex = start + url.length;
+  }
+  const tail = content.slice(lastIndex);
+  if (tail) segments.push(tail);
+  return <>{segments}</>;
+}
+
 // ─── Shield Logo ──────────────────────────────────────────────────────────────
 
 function ShieldLogo({ size = 80 }: { size?: number }) {
@@ -282,7 +315,7 @@ function OfficialPostCard({ post, index }: { post: PostView; index: number }) {
 
         {/* Post content */}
         <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
-          {post.content}
+          {renderPostContent(post.content)}
         </p>
 
         {/* Post media */}

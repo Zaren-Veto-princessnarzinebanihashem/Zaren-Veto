@@ -205,6 +205,58 @@ module {
   };
 
   /// Return all visible comments for a post (including replies).
+  /// Uses the postCommentsIndex to avoid O(n) full scan of all comments.
+  public func getCommentsByIndex(
+    comments          : List.List<Types.Comment>,
+    postCommentsIndex : Map.Map<Common.PostId, List.List<Types.CommentId>>,
+    postId            : Common.PostId,
+  ) : [Types.CommentView] {
+    switch (postCommentsIndex.get(postId)) {
+      case null { return [] };
+      case (?commentIds) {
+        if (commentIds.isEmpty()) return [];
+        // Build a Map<CommentId, Comment> from the full comments list once (O(n log n))
+        let allCommentMap = Map.empty<Types.CommentId, Types.Comment>();
+        for (c in comments.values()) {
+          allCommentMap.add(c.id, c);
+        };
+        // Collect only comments for this post (O(k log n))
+        let postCommentMap = Map.empty<Types.CommentId, Types.Comment>();
+        for (cid in commentIds.values()) {
+          switch (allCommentMap.get(cid)) {
+            case (?c) { if (not c.isDeleted) postCommentMap.add(cid, c) };
+            case null {};
+          };
+        };
+        if (postCommentMap.isEmpty()) return [];
+        // Build views — reply count is O(k) within the post's own comment map
+        let result = List.empty<Types.CommentView>();
+        for ((_cid, c) in postCommentMap.entries()) {
+          var replyCount : Nat = 0;
+          for ((_rid, r) in postCommentMap.entries()) {
+            switch (r.parentId) {
+              case (?pid) { if (pid == c.id) replyCount += 1 };
+              case null {};
+            };
+          };
+          result.add({
+            id         = c.id;
+            postId     = c.postId;
+            authorId   = c.authorId;
+            authorName = c.authorName;
+            content    = c.content;
+            parentId   = c.parentId;
+            createdAt  = c.createdAt;
+            updatedAt  = c.updatedAt;
+            replyCount;
+          });
+        };
+        result.toArray();
+      };
+    };
+  };
+
+  /// Return all visible comments for a post (including replies). Legacy full-scan version.
   public func getComments(
     comments : List.List<Types.Comment>,
     postId   : Common.PostId,
@@ -422,6 +474,28 @@ module {
   };
 
   // ── Post stats ─────────────────────────────────────────────────────────────
+
+  /// Return aggregated engagement stats for a post using the comment index.
+  public func getPostStatsIndexed(
+    likes             : Map.Map<Common.PostId, Set.Set<Common.UserId>>,
+    postCommentsIndex : Map.Map<Common.PostId, List.List<Types.CommentId>>,
+    shares            : List.List<Types.Share>,
+    postId            : Common.PostId,
+  ) : Types.PostStats {
+    let likeCount = switch (likes.get(postId)) {
+      case null       { 0 };
+      case (?likeSet) { likeSet.size() };
+    };
+    // Use index for O(1) comment count
+    let commentCount = switch (postCommentsIndex.get(postId)) {
+      case null        { 0 };
+      case (?lst)      { lst.size() };
+    };
+    let shareCount = shares.filter(func(s : Types.Share) : Bool {
+      s.postId == postId
+    }).size();
+    { likes = likeCount; comments = commentCount; shares = shareCount };
+  };
 
   /// Return aggregated engagement stats for a post.
   public func getPostStats(

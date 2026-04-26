@@ -855,15 +855,22 @@ type PasswordView = "login" | "register";
 export default function LoginPage() {
   const { login, isLoggingIn, isInitializing } = useInternetIdentity();
   const { status } = useCurrentUser();
-  const navigate = useNavigate();
   const { t, language } = useLanguage();
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<LoginTab>("password");
   const [passwordView, setPasswordView] = useState<PasswordView>("login");
 
   useEffect(() => {
     if (status === "authenticated") {
-      void navigate({ to: "/" });
+      // Defer navigation to AFTER the current React render cycle completes.
+      // Using window.location.href directly causes insertBefore/removeChild
+      // DOM crash because React is still reconciling when the navigation fires.
+      // setTimeout(0) schedules the navigation after the render is committed.
+      const timer = setTimeout(() => {
+        void navigate({ to: "/", replace: true });
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [status, navigate]);
 

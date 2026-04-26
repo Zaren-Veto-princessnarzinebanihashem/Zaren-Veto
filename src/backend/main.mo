@@ -5,9 +5,11 @@ import Common "types/common";
 import Types "types/users-posts-messages";
 import EngTypes "types/engagement";
 import NewTypes "types/stories-hashtags-friendrequests-polls-admin";
+import GroupTypes "types/groups";
 import UPMApi "mixins/users-posts-messages-api";
 import EngApi "mixins/engagement-api";
 import NewApi "mixins/stories-hashtags-friendrequests-polls-admin-api";
+import GroupsApi "mixins/groups-api";
 
 
 
@@ -28,6 +30,9 @@ actor {
   // ─── Official page posts ──────────────────────────────────────────────────
   let officialPagePosts : List.List<Types.Post>                            = List.empty();
 
+  // ─── Followers reverse index (who follows userId) — avoids O(n) full scan ──
+  let followers     : Map.Map<Common.UserId, List.List<Common.UserId>>                            = Map.empty();
+
   // ─── Engagement state ─────────────────────────────────────────────────────
   let likes         : Map.Map<Common.PostId, Set.Set<Common.UserId>>                              = Map.empty();
   let reactions     : Map.Map<Common.PostId, Map.Map<Common.UserId, EngTypes.ReactionType>>       = Map.empty();
@@ -39,6 +44,9 @@ actor {
   let nextCommentId : { var value : Nat }                                                         = { var value = 0 };
   let nextNotifId   : { var value : Nat }                                                         = { var value = 0 };
   let nextReportId  : { var value : Nat }                                                         = { var value = 0 };
+
+  // ─── Post-comments index (postId → [commentId]) — avoids O(n) full scan ──
+  let postCommentsIndex : Map.Map<Common.PostId, List.List<EngTypes.CommentId>>                   = Map.empty();
 
   // ─── Stories state ────────────────────────────────────────────────────────
   let stories       : List.List<NewTypes.Story>                            = List.empty();
@@ -60,12 +68,17 @@ actor {
   // ─── Message reactions ────────────────────────────────────────────────────
   let msgReactions  : List.List<EngTypes.MessageReaction>                  = List.empty();
 
+  // ─── Groups state ────────────────────────────────────────────────────────
+  let groups        : Map.Map<GroupTypes.GroupId, GroupTypes.Group>        = Map.empty();
+  let nextGroupId   : { var value : Nat }                                  = { var value = 0 };
+
   // ─── Mixin composition ────────────────────────────────────────────────────
-  include UPMApi(users, posts, messages, follows, verified, nextPostId, nextMessageId,
+  include UPMApi(users, posts, messages, follows, followers, verified, nextPostId, nextMessageId,
                  hashtagIndex, hashtagPostTime, officialPagePosts);
 
   include EngApi(users, posts, likes, reactions, comments, shares, notifications,
-                 savedPosts, reports, verified, nextCommentId, nextNotifId, nextReportId);
+                 savedPosts, reports, verified, nextCommentId, nextNotifId, nextReportId,
+                 postCommentsIndex);
 
   include NewApi(
     users, posts, messages, follows, verified, reports, notifications, nextNotifId, nextReportId,
@@ -76,4 +89,6 @@ actor {
     polls, pollVotes, nextPollId,
     msgReactions,
   );
+
+  include GroupsApi(groups, nextGroupId, users);
 };

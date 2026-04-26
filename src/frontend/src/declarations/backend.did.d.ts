@@ -38,6 +38,8 @@ export interface ConversationSummary {
   'otherUserId' : UserId,
   'conversationId' : ConversationId,
 }
+export type CreateGroupResult = { 'ok' : GroupView } |
+  { 'err' : string };
 export type FriendRequestId = bigint;
 export interface FriendRequestView {
   'id' : FriendRequestId,
@@ -46,7 +48,23 @@ export interface FriendRequestView {
   'from' : UserProfile,
   'createdAt' : Timestamp,
 }
+export type GroupId = bigint;
+export interface GroupView {
+  'id' : GroupId,
+  'coverImageData' : [] | [string],
+  'ownerId' : UserId,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'memberCount' : bigint,
+  'isMember' : boolean,
+  'description' : string,
+  'isPrivate' : boolean,
+  'hasCoverImage' : boolean,
+  'ownerUsername' : string,
+}
 export interface HashtagStat { 'postCount' : bigint, 'hashtag' : string }
+export type JoinLeaveGroupResult = { 'ok' : boolean } |
+  { 'err' : string };
 export type LoginWithPasswordResult = {
     'ok' : { 'userId' : UserId, 'profile' : UserProfile }
   } |
@@ -184,6 +202,10 @@ export interface _SERVICE {
   'banUser' : ActorMethod<[UserId], boolean>,
   'blockUser' : ActorMethod<[UserId], undefined>,
   'cancelFriendRequest' : ActorMethod<[bigint], boolean>,
+  'createGroup' : ActorMethod<
+    [string, string, boolean, [] | [string]],
+    CreateGroupResult
+  >,
   'createOfficialPost' : ActorMethod<
     [string, [] | [string]],
     { 'ok' : PostId } |
@@ -197,6 +219,7 @@ export interface _SERVICE {
   >,
   'createStory' : ActorMethod<[string, [] | [string]], StoryView>,
   'deleteComment' : ActorMethod<[CommentId], undefined>,
+  'deleteGroup' : ActorMethod<[GroupId], boolean>,
   'deletePost' : ActorMethod<[PostId], boolean>,
   'deleteStory' : ActorMethod<[bigint], undefined>,
   'editComment' : ActorMethod<[CommentId, string], undefined>,
@@ -208,11 +231,14 @@ export interface _SERVICE {
   'getConversations' : ActorMethod<[], Array<ConversationSummary>>,
   'getFeed' : ActorMethod<[], Array<PostView>>,
   'getFriendRequestStatus' : ActorMethod<[UserId], string>,
+  'getGroup' : ActorMethod<[GroupId], [] | [GroupView]>,
+  'getGroups' : ActorMethod<[], Array<GroupView>>,
   'getHashtagPosts' : ActorMethod<[string], Array<PostView>>,
   'getLikes' : ActorMethod<[PostId], Array<UserId>>,
   'getMessageReactions' : ActorMethod<[MessageId], Array<MessageReactionView>>,
   'getMessages' : ActorMethod<[UserId], Array<MessageView>>,
   'getMyEmail' : ActorMethod<[], [] | [string]>,
+  'getMyGroups' : ActorMethod<[], Array<GroupView>>,
   'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getMyReaction' : ActorMethod<[PostId], [] | [ReactionType]>,
   'getMyStories' : ActorMethod<[], Array<StoryView>>,
@@ -237,9 +263,12 @@ export interface _SERVICE {
   'getUserProfile' : ActorMethod<[UserId], [] | [UserProfile]>,
   'grantVerification' : ActorMethod<[UserId], boolean>,
   'hasLiked' : ActorMethod<[PostId], boolean>,
+  'inviteMember' : ActorMethod<[GroupId, string], JoinLeaveGroupResult>,
   'isBlocked' : ActorMethod<[UserId], boolean>,
   'isFollowing' : ActorMethod<[UserId], boolean>,
   'isVerified' : ActorMethod<[UserId], boolean>,
+  'joinGroup' : ActorMethod<[GroupId], JoinLeaveGroupResult>,
+  'leaveGroup' : ActorMethod<[GroupId], JoinLeaveGroupResult>,
   'likePost' : ActorMethod<[PostId], undefined>,
   'loginWithPassword' : ActorMethod<
     [string, string],

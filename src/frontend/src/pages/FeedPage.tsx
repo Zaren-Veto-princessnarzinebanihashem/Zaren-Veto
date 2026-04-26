@@ -52,6 +52,39 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+/** Renders post content with clickable blue URLs */
+function renderPostContent(content: string): React.ReactNode {
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const matches = Array.from(
+    content.matchAll(new RegExp(urlRegex.source, "g")),
+  );
+  if (matches.length === 0) return content;
+  const segments: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of matches) {
+    const url = match[0];
+    const start = match.index ?? 0;
+    const before = content.slice(lastIndex, start);
+    if (before) segments.push(before);
+    segments.push(
+      <a
+        key={start}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[#1877F2] underline hover:text-blue-400 break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>,
+    );
+    lastIndex = start + url.length;
+  }
+  const tail = content.slice(lastIndex);
+  if (tail) segments.push(tail);
+  return <>{segments}</>;
+}
+
 function formatRelativeTime(timestamp: bigint): string {
   const ms = Number(timestamp) / 1_000_000;
   const diffMs = Date.now() - ms;
@@ -1557,7 +1590,7 @@ function PostCard({
             </div>
           ) : (
             <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words mb-1">
-              {post.content}
+              {renderPostContent(post.content)}
             </p>
           )}
 

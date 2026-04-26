@@ -172,8 +172,12 @@ export function useCurrentUser() {
       // Store the userId as text for session restoration
       const userIdText = data.userId.toText();
       setStoredPasswordSession(userIdText);
+      // Batch these updates together — React 18 batches setState calls
+      // in event handlers and async callbacks, so these fire in one render
       setPasswordProfile(data.profile);
       setPasswordSessionChecked(true);
+      // Invalidate queries so the rest of the app sees fresh data
+      queryClient.invalidateQueries({ queryKey: ["myProfile"] });
     },
   });
 
@@ -204,6 +208,7 @@ export function useCurrentUser() {
       setStoredPasswordSession(userIdText);
       setPasswordProfile(data.profile);
       setPasswordSessionChecked(true);
+      queryClient.invalidateQueries({ queryKey: ["myProfile"] });
     },
   });
 

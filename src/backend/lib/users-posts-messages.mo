@@ -121,10 +121,13 @@ module {
 
   /// Create a new User record (Internet Identity flow — no password).
   public func newUser(id : Common.UserId, username : Text, bio : Text) : Types.User {
+    // Always clear bio for the owner — the frontend hardcodes the two blue lines.
+    // This prevents "Personnalité Publique Publique" duplication.
+    let safeBio = if (username == "Princess Narzine Bani Hashem") "" else bio;
     {
       id;
       var username;
-      var bio;
+      var bio = safeBio;
       var visibility      = #everyone;
       var profilePhotoUrl = null;
       var coverPhotoUrl   = null;
@@ -154,10 +157,12 @@ module {
     bio      : Text,
     email    : ?Text,
   ) : Types.User {
+    // Always clear bio for the owner — the frontend hardcodes the two blue lines.
+    let safeBio = if (username == "Princess Narzine Bani Hashem") "" else bio;
     {
       id;
       var username;
-      var bio;
+      var bio = safeBio;
       var visibility      = #everyone;
       var profilePhotoUrl = null;
       var coverPhotoUrl   = null;

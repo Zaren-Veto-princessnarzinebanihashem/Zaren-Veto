@@ -11,6 +11,25 @@ import { IDL } from '@icp-sdk/core/candid';
 export const PostId = IDL.Nat;
 export const CommentId = IDL.Nat;
 export const UserId = IDL.Principal;
+export const GroupId = IDL.Nat;
+export const Timestamp = IDL.Int;
+export const GroupView = IDL.Record({
+  'id' : GroupId,
+  'coverImageData' : IDL.Opt(IDL.Text),
+  'ownerId' : UserId,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'memberCount' : IDL.Nat,
+  'isMember' : IDL.Bool,
+  'description' : IDL.Text,
+  'isPrivate' : IDL.Bool,
+  'hasCoverImage' : IDL.Bool,
+  'ownerUsername' : IDL.Text,
+});
+export const CreateGroupResult = IDL.Variant({
+  'ok' : GroupView,
+  'err' : IDL.Text,
+});
 export const Visibility = IDL.Variant({
   'everyone' : IDL.Null,
   'followersOnly' : IDL.Null,
@@ -18,7 +37,6 @@ export const Visibility = IDL.Variant({
   'customList' : IDL.Null,
 });
 export const StoryId = IDL.Nat;
-export const Timestamp = IDL.Int;
 export const UserProfile = IDL.Record({
   'id' : UserId,
   'bio' : IDL.Text,
@@ -171,6 +189,10 @@ export const HashtagStat = IDL.Record({
   'postCount' : IDL.Nat,
   'hashtag' : IDL.Text,
 });
+export const JoinLeaveGroupResult = IDL.Variant({
+  'ok' : IDL.Bool,
+  'err' : IDL.Text,
+});
 export const LoginWithPasswordResult = IDL.Variant({
   'ok' : IDL.Record({ 'userId' : UserId, 'profile' : UserProfile }),
   'err' : IDL.Text,
@@ -196,6 +218,11 @@ export const idlService = IDL.Service({
   'banUser' : IDL.Func([UserId], [IDL.Bool], []),
   'blockUser' : IDL.Func([UserId], [], []),
   'cancelFriendRequest' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'createGroup' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Bool, IDL.Opt(IDL.Text)],
+      [CreateGroupResult],
+      [],
+    ),
   'createOfficialPost' : IDL.Func(
       [IDL.Text, IDL.Opt(IDL.Text)],
       [IDL.Variant({ 'ok' : PostId, 'err' : IDL.Text })],
@@ -209,6 +236,7 @@ export const idlService = IDL.Service({
     ),
   'createStory' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [StoryView], []),
   'deleteComment' : IDL.Func([CommentId], [], []),
+  'deleteGroup' : IDL.Func([GroupId], [IDL.Bool], []),
   'deletePost' : IDL.Func([PostId], [IDL.Bool], []),
   'deleteStory' : IDL.Func([IDL.Nat], [], []),
   'editComment' : IDL.Func([CommentId, IDL.Text], [], []),
@@ -224,6 +252,8 @@ export const idlService = IDL.Service({
   'getConversations' : IDL.Func([], [IDL.Vec(ConversationSummary)], ['query']),
   'getFeed' : IDL.Func([], [IDL.Vec(PostView)], ['query']),
   'getFriendRequestStatus' : IDL.Func([UserId], [IDL.Text], ['query']),
+  'getGroup' : IDL.Func([GroupId], [IDL.Opt(GroupView)], ['query']),
+  'getGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
   'getHashtagPosts' : IDL.Func([IDL.Text], [IDL.Vec(PostView)], ['query']),
   'getLikes' : IDL.Func([PostId], [IDL.Vec(UserId)], ['query']),
   'getMessageReactions' : IDL.Func(
@@ -233,6 +263,7 @@ export const idlService = IDL.Service({
     ),
   'getMessages' : IDL.Func([UserId], [IDL.Vec(MessageView)], ['query']),
   'getMyEmail' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
+  'getMyGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
   'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getMyReaction' : IDL.Func([PostId], [IDL.Opt(ReactionType)], []),
   'getMyStories' : IDL.Func([], [IDL.Vec(StoryView)], ['query']),
@@ -265,9 +296,12 @@ export const idlService = IDL.Service({
   'getUserProfile' : IDL.Func([UserId], [IDL.Opt(UserProfile)], ['query']),
   'grantVerification' : IDL.Func([UserId], [IDL.Bool], []),
   'hasLiked' : IDL.Func([PostId], [IDL.Bool], []),
+  'inviteMember' : IDL.Func([GroupId, IDL.Text], [JoinLeaveGroupResult], []),
   'isBlocked' : IDL.Func([UserId], [IDL.Bool], ['query']),
   'isFollowing' : IDL.Func([UserId], [IDL.Bool], ['query']),
   'isVerified' : IDL.Func([UserId], [IDL.Bool], ['query']),
+  'joinGroup' : IDL.Func([GroupId], [JoinLeaveGroupResult], []),
+  'leaveGroup' : IDL.Func([GroupId], [JoinLeaveGroupResult], []),
   'likePost' : IDL.Func([PostId], [], []),
   'loginWithPassword' : IDL.Func(
       [IDL.Text, IDL.Text],
@@ -359,6 +393,22 @@ export const idlFactory = ({ IDL }) => {
   const PostId = IDL.Nat;
   const CommentId = IDL.Nat;
   const UserId = IDL.Principal;
+  const GroupId = IDL.Nat;
+  const Timestamp = IDL.Int;
+  const GroupView = IDL.Record({
+    'id' : GroupId,
+    'coverImageData' : IDL.Opt(IDL.Text),
+    'ownerId' : UserId,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'memberCount' : IDL.Nat,
+    'isMember' : IDL.Bool,
+    'description' : IDL.Text,
+    'isPrivate' : IDL.Bool,
+    'hasCoverImage' : IDL.Bool,
+    'ownerUsername' : IDL.Text,
+  });
+  const CreateGroupResult = IDL.Variant({ 'ok' : GroupView, 'err' : IDL.Text });
   const Visibility = IDL.Variant({
     'everyone' : IDL.Null,
     'followersOnly' : IDL.Null,
@@ -366,7 +416,6 @@ export const idlFactory = ({ IDL }) => {
     'customList' : IDL.Null,
   });
   const StoryId = IDL.Nat;
-  const Timestamp = IDL.Int;
   const UserProfile = IDL.Record({
     'id' : UserId,
     'bio' : IDL.Text,
@@ -519,6 +568,10 @@ export const idlFactory = ({ IDL }) => {
     'postCount' : IDL.Nat,
     'hashtag' : IDL.Text,
   });
+  const JoinLeaveGroupResult = IDL.Variant({
+    'ok' : IDL.Bool,
+    'err' : IDL.Text,
+  });
   const LoginWithPasswordResult = IDL.Variant({
     'ok' : IDL.Record({ 'userId' : UserId, 'profile' : UserProfile }),
     'err' : IDL.Text,
@@ -544,6 +597,11 @@ export const idlFactory = ({ IDL }) => {
     'banUser' : IDL.Func([UserId], [IDL.Bool], []),
     'blockUser' : IDL.Func([UserId], [], []),
     'cancelFriendRequest' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'createGroup' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Bool, IDL.Opt(IDL.Text)],
+        [CreateGroupResult],
+        [],
+      ),
     'createOfficialPost' : IDL.Func(
         [IDL.Text, IDL.Opt(IDL.Text)],
         [IDL.Variant({ 'ok' : PostId, 'err' : IDL.Text })],
@@ -561,6 +619,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'createStory' : IDL.Func([IDL.Text, IDL.Opt(IDL.Text)], [StoryView], []),
     'deleteComment' : IDL.Func([CommentId], [], []),
+    'deleteGroup' : IDL.Func([GroupId], [IDL.Bool], []),
     'deletePost' : IDL.Func([PostId], [IDL.Bool], []),
     'deleteStory' : IDL.Func([IDL.Nat], [], []),
     'editComment' : IDL.Func([CommentId, IDL.Text], [], []),
@@ -580,6 +639,8 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getFeed' : IDL.Func([], [IDL.Vec(PostView)], ['query']),
     'getFriendRequestStatus' : IDL.Func([UserId], [IDL.Text], ['query']),
+    'getGroup' : IDL.Func([GroupId], [IDL.Opt(GroupView)], ['query']),
+    'getGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
     'getHashtagPosts' : IDL.Func([IDL.Text], [IDL.Vec(PostView)], ['query']),
     'getLikes' : IDL.Func([PostId], [IDL.Vec(UserId)], ['query']),
     'getMessageReactions' : IDL.Func(
@@ -589,6 +650,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getMessages' : IDL.Func([UserId], [IDL.Vec(MessageView)], ['query']),
     'getMyEmail' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
+    'getMyGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getMyReaction' : IDL.Func([PostId], [IDL.Opt(ReactionType)], []),
     'getMyStories' : IDL.Func([], [IDL.Vec(StoryView)], ['query']),
@@ -629,9 +691,12 @@ export const idlFactory = ({ IDL }) => {
     'getUserProfile' : IDL.Func([UserId], [IDL.Opt(UserProfile)], ['query']),
     'grantVerification' : IDL.Func([UserId], [IDL.Bool], []),
     'hasLiked' : IDL.Func([PostId], [IDL.Bool], []),
+    'inviteMember' : IDL.Func([GroupId, IDL.Text], [JoinLeaveGroupResult], []),
     'isBlocked' : IDL.Func([UserId], [IDL.Bool], ['query']),
     'isFollowing' : IDL.Func([UserId], [IDL.Bool], ['query']),
     'isVerified' : IDL.Func([UserId], [IDL.Bool], ['query']),
+    'joinGroup' : IDL.Func([GroupId], [JoinLeaveGroupResult], []),
+    'leaveGroup' : IDL.Func([GroupId], [JoinLeaveGroupResult], []),
     'likePost' : IDL.Func([PostId], [], []),
     'loginWithPassword' : IDL.Func(
         [IDL.Text, IDL.Text],

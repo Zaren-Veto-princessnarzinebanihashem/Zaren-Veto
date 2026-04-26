@@ -216,6 +216,31 @@ export const mockBackend: backendInterface = {
   updateOfficialPageCoverPhoto: async (_url: string) => ({ ok: null } as any),
   updateOfficialPageProfilePhoto: async (_url: string) => ({ ok: null } as any),
   setMyPassword: async () => ({ __kind__: "ok" as const, ok: true }),
+
+  // Group methods
+  createGroup: async () => ({
+    __kind__: "ok" as const,
+    ok: {
+      id: BigInt(1),
+      name: "Mock Group",
+      description: "",
+      hasCoverImage: false,
+      coverImageData: undefined,
+      isPrivate: false,
+      ownerId: samplePrincipal,
+      ownerUsername: "zaren_user",
+      memberCount: BigInt(1),
+      isMember: true,
+      createdAt: BigInt(Date.now()),
+    },
+  }),
+  deleteGroup: async () => true,
+  getGroup: async () => null,
+  getGroups: async () => [],
+  getMyGroups: async () => [],
+  inviteMember: async () => ({ __kind__: "ok" as const, ok: true }),
+  joinGroup: async () => ({ __kind__: "ok" as const, ok: true }),
+  leaveGroup: async () => ({ __kind__: "ok" as const, ok: true }),
 };
 
 // Suppress unused import warning

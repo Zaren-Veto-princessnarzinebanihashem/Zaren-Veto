@@ -14,6 +14,19 @@ export interface PollOptionResult {
     text: string;
     percent: number;
 }
+export interface GroupView {
+    id: GroupId;
+    coverImageData?: string;
+    ownerId: UserId;
+    name: string;
+    createdAt: Timestamp;
+    memberCount: bigint;
+    isMember: boolean;
+    description: string;
+    isPrivate: boolean;
+    hasCoverImage: boolean;
+    ownerUsername: string;
+}
 export type PostId = bigint;
 export interface PostView {
     id: PostId;
@@ -55,6 +68,14 @@ export interface NotificationView {
     isRead: boolean;
     actorId: UserId;
 }
+export type GroupId = bigint;
+export type CreateGroupResult = {
+    __kind__: "ok";
+    ok: GroupView;
+} | {
+    __kind__: "err";
+    err: string;
+};
 export type ConversationId = string;
 export interface StoryView {
     id: StoryId;
@@ -163,14 +184,13 @@ export type NotificationType = {
     follow: {
     };
 };
-export interface AdminStats {
-    pendingReports: bigint;
-    totalMessages: bigint;
-    verifiedUsers: bigint;
-    totalUsers: bigint;
-    totalPosts: bigint;
-    totalStories: bigint;
-}
+export type JoinLeaveGroupResult = {
+    __kind__: "ok";
+    ok: boolean;
+} | {
+    __kind__: "err";
+    err: string;
+};
 export type MessageId = bigint;
 export type NotificationId = bigint;
 export interface MessageView {
@@ -181,6 +201,14 @@ export interface MessageView {
     conversationId: ConversationId;
     senderId: UserId;
     readAt?: Timestamp;
+}
+export interface AdminStats {
+    pendingReports: bigint;
+    totalMessages: bigint;
+    verifiedUsers: bigint;
+    totalUsers: bigint;
+    totalPosts: bigint;
+    totalStories: bigint;
 }
 export interface UserProfile {
     id: UserId;
@@ -231,6 +259,7 @@ export interface backendInterface {
     banUser(userId: UserId): Promise<boolean>;
     blockUser(userId: UserId): Promise<void>;
     cancelFriendRequest(requestId: bigint): Promise<boolean>;
+    createGroup(name: string, description: string, isPrivate: boolean, coverImageData: string | null): Promise<CreateGroupResult>;
     createOfficialPost(content: string, imageUrl: string | null): Promise<{
         __kind__: "ok";
         ok: PostId;
@@ -248,6 +277,7 @@ export interface backendInterface {
     }>;
     createStory(imageUrl: string, textOverlay: string | null): Promise<StoryView>;
     deleteComment(commentId: CommentId): Promise<void>;
+    deleteGroup(groupId: GroupId): Promise<boolean>;
     deletePost(postId: PostId): Promise<boolean>;
     deleteStory(storyId: bigint): Promise<void>;
     editComment(commentId: CommentId, text: string): Promise<void>;
@@ -259,11 +289,14 @@ export interface backendInterface {
     getConversations(): Promise<Array<ConversationSummary>>;
     getFeed(): Promise<Array<PostView>>;
     getFriendRequestStatus(userId: UserId): Promise<string>;
+    getGroup(groupId: GroupId): Promise<GroupView | null>;
+    getGroups(): Promise<Array<GroupView>>;
     getHashtagPosts(hashtag: string): Promise<Array<PostView>>;
     getLikes(postId: PostId): Promise<Array<UserId>>;
     getMessageReactions(messageId: MessageId): Promise<Array<MessageReactionView>>;
     getMessages(otherUser: UserId): Promise<Array<MessageView>>;
     getMyEmail(): Promise<string | null>;
+    getMyGroups(): Promise<Array<GroupView>>;
     getMyProfile(): Promise<UserProfile | null>;
     getMyReaction(postId: PostId): Promise<ReactionType | null>;
     getMyStories(): Promise<Array<StoryView>>;
@@ -288,9 +321,12 @@ export interface backendInterface {
     getUserProfile(userId: UserId): Promise<UserProfile | null>;
     grantVerification(userId: UserId): Promise<boolean>;
     hasLiked(postId: PostId): Promise<boolean>;
+    inviteMember(groupId: GroupId, username: string): Promise<JoinLeaveGroupResult>;
     isBlocked(userId: UserId): Promise<boolean>;
     isFollowing(target: UserId): Promise<boolean>;
     isVerified(userId: UserId): Promise<boolean>;
+    joinGroup(groupId: GroupId): Promise<JoinLeaveGroupResult>;
+    leaveGroup(groupId: GroupId): Promise<JoinLeaveGroupResult>;
     likePost(postId: PostId): Promise<void>;
     loginWithPassword(username: string, password: string): Promise<{
         __kind__: "ok";

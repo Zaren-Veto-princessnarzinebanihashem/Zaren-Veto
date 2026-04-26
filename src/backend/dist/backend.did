@@ -167,11 +167,31 @@ type LoginWithPasswordResult =
          userId: UserId;
        };
  };
+type JoinLeaveGroupResult = 
+ variant {
+   err: text;
+   ok: bool;
+ };
 type HashtagStat = 
  record {
    hashtag: text;
    postCount: nat;
  };
+type GroupView = 
+ record {
+   coverImageData: opt text;
+   createdAt: Timestamp;
+   description: text;
+   hasCoverImage: bool;
+   id: GroupId;
+   isMember: bool;
+   isPrivate: bool;
+   memberCount: nat;
+   name: text;
+   ownerId: UserId;
+   ownerUsername: text;
+ };
+type GroupId = nat;
 type FriendRequestView = 
  record {
    createdAt: Timestamp;
@@ -181,6 +201,11 @@ type FriendRequestView =
    to: UserProfile;
  };
 type FriendRequestId = nat;
+type CreateGroupResult = 
+ variant {
+   err: text;
+   ok: GroupView;
+ };
 type ConversationSummary = 
  record {
    conversationId: ConversationId;
@@ -217,6 +242,8 @@ service : {
   banUser: (userId: UserId) -> (bool);
   blockUser: (userId: UserId) -> ();
   cancelFriendRequest: (requestId: nat) -> (bool);
+  createGroup: (name: text, description: text, isPrivate: bool,
+   coverImageData: opt text) -> (CreateGroupResult);
   createOfficialPost: (content: text, imageUrl: opt text) ->
    (variant {
       err: text;
@@ -230,6 +257,7 @@ service : {
                                        });
   createStory: (imageUrl: text, textOverlay: opt text) -> (StoryView);
   deleteComment: (commentId: CommentId) -> ();
+  deleteGroup: (groupId: GroupId) -> (bool);
   deletePost: (postId: PostId) -> (bool);
   deleteStory: (storyId: nat) -> ();
   editComment: (commentId: CommentId, "text": text) -> ();
@@ -241,12 +269,15 @@ service : {
   getConversations: () -> (vec ConversationSummary) query;
   getFeed: () -> (vec PostView) query;
   getFriendRequestStatus: (userId: UserId) -> (text) query;
+  getGroup: (groupId: GroupId) -> (opt GroupView) query;
+  getGroups: () -> (vec GroupView) query;
   getHashtagPosts: (hashtag: text) -> (vec PostView) query;
   getLikes: (postId: PostId) -> (vec UserId) query;
   getMessageReactions: (messageId: MessageId) ->
    (vec MessageReactionView) query;
   getMessages: (otherUser: UserId) -> (vec MessageView) query;
   getMyEmail: () -> (opt text) query;
+  getMyGroups: () -> (vec GroupView) query;
   getMyProfile: () -> (opt UserProfile) query;
   getMyReaction: (postId: PostId) -> (opt ReactionType);
   getMyStories: () -> (vec StoryView) query;
@@ -274,9 +305,12 @@ service : {
   getUserProfile: (userId: UserId) -> (opt UserProfile) query;
   grantVerification: (userId: UserId) -> (bool);
   hasLiked: (postId: PostId) -> (bool);
+  inviteMember: (groupId: GroupId, username: text) -> (JoinLeaveGroupResult);
   isBlocked: (userId: UserId) -> (bool) query;
   isFollowing: (target: UserId) -> (bool) query;
   isVerified: (userId: UserId) -> (bool) query;
+  joinGroup: (groupId: GroupId) -> (JoinLeaveGroupResult);
+  leaveGroup: (groupId: GroupId) -> (JoinLeaveGroupResult);
   likePost: (postId: PostId) -> ();
   loginWithPassword: (username: text, password: text) ->
    (variant {

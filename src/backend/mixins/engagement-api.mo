@@ -30,6 +30,9 @@ mixin (
   nextCommentId : { var value : Nat },
   nextNotifId   : { var value : Nat },
   nextReportId  : { var value : Nat },
+
+  // ── Post-comments index (postId → [commentId]) ────────────────────────────
+  postCommentsIndex : Map.Map<Common.PostId, List.List<EngTypes.CommentId>>,
 ) {
 
   // ── Internal helpers ──────────────────────────────────────────────────────
@@ -121,6 +124,16 @@ mixin (
     let now  = Time.now();
     let id   = Lib.addComment(comments, nextCommentId, postId, text, null,
                               caller, user.username, now);
+    // Update post-comments index
+    let postList = switch (postCommentsIndex.get(postId)) {
+      case (?lst) lst;
+      case null {
+        let lst = List.empty<EngTypes.CommentId>();
+        postCommentsIndex.add(postId, lst);
+        lst;
+      };
+    };
+    postList.add(id);
     switch (postAuthor(postId)) {
       case (?authorId) {
         Lib.pushNotification(notifications, nextNotifId, authorId, caller,
@@ -145,6 +158,16 @@ mixin (
     };
     let id = Lib.addComment(comments, nextCommentId, parentPostId, text,
                             ?parentCommentId, caller, user.username, now);
+    // Update post-comments index for the reply too
+    let postList = switch (postCommentsIndex.get(parentPostId)) {
+      case (?lst) lst;
+      case null {
+        let lst = List.empty<EngTypes.CommentId>();
+        postCommentsIndex.add(parentPostId, lst);
+        lst;
+      };
+    };
+    postList.add(id);
     switch (postAuthor(parentPostId)) {
       case (?authorId) {
         Lib.pushNotification(notifications, nextNotifId, authorId, caller,
@@ -167,7 +190,7 @@ mixin (
   };
 
   public query func getComments(postId : Common.PostId) : async [EngTypes.CommentView] {
-    Lib.getComments(comments, postId);
+    Lib.getCommentsByIndex(comments, postCommentsIndex, postId);
   };
 
   // ── Shares ────────────────────────────────────────────────────────────────
@@ -304,6 +327,6 @@ mixin (
   // ── Post stats ────────────────────────────────────────────────────────────
 
   public query func getPostStats(postId : Common.PostId) : async EngTypes.PostStats {
-    Lib.getPostStats(likes, comments, shares, postId);
+    Lib.getPostStatsIndexed(likes, postCommentsIndex, shares, postId);
   };
 };

@@ -4,27 +4,41 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuthenticatedBackend } from "@/hooks/useAuthenticatedBackend";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Globe, Lock, Plus, Users, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  Globe,
+  Lock,
+  Plus,
+  RefreshCw,
+  Users,
+  X,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface LocalGroup {
-  id: string;
+interface GroupView {
+  id: bigint;
   name: string;
   description: string;
+  hasCoverImage: boolean;
+  coverImageData: [] | [string];
   isPrivate: boolean;
-  memberCount: number;
-  createdAt: number;
-  coverColor: string;
+  ownerId: { toText(): string };
+  ownerUsername: string;
+  memberCount: bigint;
+  isMember: boolean;
+  createdAt: bigint;
 }
 
-// ─── Sample seed data ─────────────────────────────────────────────────────────
+// ─── Cover color palette (used when no cover image) ──────────────────────────
 
 const COVER_COLORS = [
   "from-violet-600 to-indigo-600",
@@ -34,43 +48,35 @@ const COVER_COLORS = [
   "from-sky-500 to-blue-600",
 ];
 
-const INITIAL_GROUPS: LocalGroup[] = [
-  {
-    id: "g1",
-    name: "Zaren Veto Community",
-    description:
-      "La communauté officielle de Zaren Veto — discussions, annonces et partages.",
-    isPrivate: false,
-    memberCount: 19,
-    createdAt: Date.now() - 86400000 * 7,
-    coverColor: COVER_COLORS[0],
-  },
-  {
-    id: "g2",
-    name: "Privacy & Digital Rights",
-    description:
-      "Partagez des ressources sur la souveraineté numérique et la protection de la vie privée.",
-    isPrivate: false,
-    memberCount: 8,
-    createdAt: Date.now() - 86400000 * 3,
-    coverColor: COVER_COLORS[4],
-  },
-];
+function getCoverColor(id: bigint | string): string {
+  const n = Number(typeof id === "bigint" ? id % 5n : id);
+  return COVER_COLORS[Math.abs(n) % COVER_COLORS.length];
+}
 
 // ─── Group Card ───────────────────────────────────────────────────────────────
 
 function GroupCard({
   group,
   index,
+  onJoin,
+  joining,
 }: {
-  group: LocalGroup;
+  group: GroupView;
   index: number;
+  onJoin: (id: bigint) => void;
+  joining: boolean;
 }) {
-  const date = new Date(group.createdAt).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  const date = new Date(Number(group.createdAt) / 1_000_000).toLocaleDateString(
+    undefined,
+    {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    },
+  );
+
+  const memberCount = Number(group.memberCount);
+  const coverColor = getCoverColor(group.id);
 
   return (
     <motion.div
@@ -81,7 +87,7 @@ function GroupCard({
       data-ocid={`groups.item.${index + 1}`}
     >
       {/* Cover strip */}
-      <div className={`h-20 bg-gradient-to-r ${group.coverColor} relative`}>
+      <div className={`h-20 bg-gradient-to-r ${coverColor} relative`}>
         <div className="absolute inset-0 flex items-center justify-center opacity-20">
           <Users className="w-12 h-12 text-white" />
         </div>
@@ -108,24 +114,27 @@ function GroupCard({
             {group.isPrivate ? "Privé" : "Public"}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-          {group.description}
-        </p>
+        {group.description && (
+          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+            {group.description}
+          </p>
+        )}
         <div className="flex items-center justify-between pt-1">
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Users className="w-3.5 h-3.5" />
-            {group.memberCount} membre{group.memberCount !== 1 ? "s" : ""}
+            {memberCount} membre{memberCount !== 1 ? "s" : ""}
           </span>
           <span className="text-xs text-muted-foreground">{date}</span>
         </div>
         <Button
           size="sm"
-          variant="outline"
-          className="w-full mt-1 border-primary/30 text-primary hover:bg-primary/10"
+          variant={group.isMember ? "outline" : "default"}
+          className="w-full mt-1"
           data-ocid={`groups.join_button.${index + 1}`}
-          onClick={() => toast.success(`Vous avez rejoint "${group.name}" !`)}
+          disabled={joining || group.isMember}
+          onClick={() => !group.isMember && onJoin(group.id)}
         >
-          Rejoindre le groupe
+          {group.isMember ? "Membre" : "Rejoindre le groupe"}
         </Button>
       </div>
     </motion.div>
@@ -136,18 +145,18 @@ function GroupCard({
 
 function CreateGroupModal({
   onClose,
-  onCreate,
+  onCreated,
 }: {
   onClose: () => void;
-  onCreate: (
-    g: Omit<LocalGroup, "id" | "createdAt" | "memberCount" | "coverColor">,
-  ) => void;
+  onCreated: () => void;
 }) {
+  const { actor } = useAuthenticatedBackend();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,13 +164,48 @@ function CreateGroupModal({
       toast.error("Le nom du groupe est requis.");
       return;
     }
+    if (!actor) {
+      toast.error("Non connecté");
+      return;
+    }
     setSubmitting(true);
-    // Simulate async — backend method will be added in a future release
-    await new Promise((r) => setTimeout(r, 700));
-    onCreate({ name: name.trim(), description: description.trim(), isPrivate });
-    setDone(true);
-    setSubmitting(false);
-    setTimeout(onClose, 900);
+    setError("");
+    try {
+      // Call backend createGroup
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const backendActor = actor as any;
+      if (typeof backendActor.createGroup !== "function") {
+        throw new Error(
+          "La fonctionnalité groupes n'est pas encore disponible sur ce serveur.",
+        );
+      }
+      const result = await backendActor.createGroup(
+        name.trim(),
+        description.trim(),
+        isPrivate,
+        null,
+      );
+      if (
+        result &&
+        typeof result === "object" &&
+        "__kind__" in result &&
+        result.__kind__ === "err"
+      ) {
+        throw new Error(result.err as string);
+      }
+      setDone(true);
+      toast.success(`Groupe "${name.trim()}" créé avec succès !`);
+      setTimeout(() => {
+        onCreated();
+        onClose();
+      }, 800);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Erreur lors de la création";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -277,6 +321,14 @@ function CreateGroupModal({
             </div>
           </button>
 
+          {/* Error message */}
+          {error && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
           <div className="flex gap-2 pt-1">
             <Button
               type="submit"
@@ -322,33 +374,65 @@ function CreateGroupModal({
 export default function GroupsPage() {
   const { status } = useCurrentUser();
   const navigate = useNavigate();
+  const { actor, isFetching } = useAuthenticatedBackend();
   const { t: _t } = useLanguage();
-  const [groups, setGroups] = useState<LocalGroup[]>(INITIAL_GROUPS);
+  const [groups, setGroups] = useState<GroupView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [joiningId, setJoiningId] = useState<bigint | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") void navigate({ to: "/login" });
   }, [status, navigate]);
 
-  // Simulate initial load
-  useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(t);
-  }, []);
+  const loadGroups = useCallback(async () => {
+    if (!actor || isFetching) return;
+    setLoading(true);
+    setLoadError("");
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const backendActor = actor as any;
+      if (typeof backendActor.getGroups !== "function") {
+        // Backend groups not deployed yet — show empty state gracefully
+        setGroups([]);
+        setLoading(false);
+        return;
+      }
+      const result = (await backendActor.getGroups()) as GroupView[];
+      setGroups(result ?? []);
+    } catch {
+      setLoadError("Impossible de charger les groupes.");
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [actor, isFetching]);
 
-  const handleCreate = (
-    g: Omit<LocalGroup, "id" | "createdAt" | "memberCount" | "coverColor">,
-  ) => {
-    const newGroup: LocalGroup = {
-      ...g,
-      id: `g${Date.now()}`,
-      memberCount: 1,
-      createdAt: Date.now(),
-      coverColor: COVER_COLORS[groups.length % COVER_COLORS.length],
-    };
-    setGroups((prev) => [newGroup, ...prev]);
-    toast.success(`Groupe "${g.name}" créé avec succès !`);
+  // Load groups on mount and when actor becomes available
+  useEffect(() => {
+    if (actor && !isFetching) {
+      void loadGroups();
+    }
+  }, [actor, isFetching, loadGroups]);
+
+  const handleJoin = async (groupId: bigint) => {
+    if (!actor) return;
+    setJoiningId(groupId);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const backendActor = actor as any;
+      if (typeof backendActor.joinGroup === "function") {
+        await backendActor.joinGroup(groupId);
+      }
+      // Reload to get fresh isMember state
+      await loadGroups();
+      toast.success("Vous avez rejoint le groupe !");
+    } catch {
+      toast.error("Impossible de rejoindre le groupe.");
+    } finally {
+      setJoiningId(null);
+    }
   };
 
   if (status === "initializing") {
@@ -381,16 +465,42 @@ export default function GroupsPage() {
               Rejoignez des communautés ou créez la vôtre.
             </p>
           </div>
-          <Button
-            onClick={() => setShowCreate(true)}
-            className="gap-2 shrink-0"
-            data-ocid="groups.create_button"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Créer un groupe</span>
-            <span className="sm:hidden">Créer</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void loadGroups()}
+              disabled={loading}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              aria-label="Actualiser"
+              data-ocid="groups.refresh_button"
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+              />
+            </Button>
+            <Button
+              onClick={() => setShowCreate(true)}
+              className="gap-2 shrink-0"
+              data-ocid="groups.create_button"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Créer un groupe</span>
+              <span className="sm:hidden">Créer</span>
+            </Button>
+          </div>
         </div>
+
+        {/* Error banner */}
+        {loadError && (
+          <div
+            className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive"
+            data-ocid="groups.error_state"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {loadError}
+          </div>
+        )}
 
         {/* Groups grid */}
         {loading ? (
@@ -408,7 +518,7 @@ export default function GroupsPage() {
               <Users className="w-8 h-8 text-muted-foreground" />
             </div>
             <h2 className="font-display text-xl font-semibold text-foreground mb-2">
-              Aucun groupe pour l'instant
+              Aucun groupe pour l&apos;instant
             </h2>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               Créez votre premier groupe et invitez vos amis à rejoindre la
@@ -429,16 +539,16 @@ export default function GroupsPage() {
             data-ocid="groups.list"
           >
             {groups.map((g, i) => (
-              <GroupCard key={g.id} group={g} index={i} />
+              <GroupCard
+                key={g.id.toString()}
+                group={g}
+                index={i}
+                onJoin={(id) => void handleJoin(id)}
+                joining={joiningId === g.id}
+              />
             ))}
           </div>
         )}
-
-        {/* Note about full backend persistence */}
-        <p className="text-xs text-muted-foreground text-center px-4">
-          Les groupes sont en version bêta. La persistance complète sur le
-          backend est en cours de développement.
-        </p>
       </div>
 
       {/* Create modal */}
@@ -446,7 +556,7 @@ export default function GroupsPage() {
         {showCreate && (
           <CreateGroupModal
             onClose={() => setShowCreate(false)}
-            onCreate={handleCreate}
+            onCreated={() => void loadGroups()}
           />
         )}
       </AnimatePresence>

@@ -54,6 +54,39 @@ import { toast } from "sonner";
 
 // ─── Reaction definitions ─────────────────────────────────────────────────────
 
+/** Renders post content with clickable blue URLs */
+function renderPostContent(content: string): React.ReactNode {
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const matches = Array.from(
+    content.matchAll(new RegExp(urlRegex.source, "g")),
+  );
+  if (matches.length === 0) return content;
+  const segments: React.ReactNode[] = [];
+  let lastIndex = 0;
+  for (const match of matches) {
+    const url = match[0];
+    const start = match.index ?? 0;
+    const before = content.slice(lastIndex, start);
+    if (before) segments.push(before);
+    segments.push(
+      <a
+        key={start}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-[#1877F2] underline hover:text-blue-400 break-all"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {url}
+      </a>,
+    );
+    lastIndex = start + url.length;
+  }
+  const tail = content.slice(lastIndex);
+  if (tail) segments.push(tail);
+  return <>{segments}</>;
+}
+
 const REACTIONS: Array<{ type: ReactionType; emoji: string }> = [
   { type: ReactionType.love, emoji: "❤️" },
   { type: ReactionType.haha, emoji: "😂" },
@@ -729,18 +762,21 @@ function ProfileHero({
             <VisibilityBadge visibility={profile.visibility} />
           </div>
 
-          {/* User bio — NEVER rendered for the owner (owner gets exactly 2 fixed blue lines below) */}
+          {/* User bio — NEVER rendered for the owner.
+              Double-guarded: isVerified prop (from parent) AND direct isOwnerProfile check.
+              This prevents ANY chance of profile.bio appearing alongside the hardcoded
+              blue lines, regardless of prop timing or state update batching. */}
           {profile.bio &&
+            !isVerified &&
             !isOwnerProfile(profile.username, profile.isVerified) && (
               <p className="text-sm text-muted-foreground leading-relaxed max-w-lg break-words">
                 {profile.bio}
               </p>
             )}
 
-          {/* Owner-only blue profile lines — EXACTLY two lines, no duplicates ever.
-              isOwnerProfile covers both username-match and backend isVerified flag.
-              profile.bio is intentionally NOT rendered here to prevent any duplication. */}
-          {isOwnerProfile(profile.username, profile.isVerified) && (
+          {/* Owner-only blue profile lines — EXACTLY two hardcoded lines, zero duplication.
+              Rendered only when isVerified=true (owner). profile.bio is NEVER shown here. */}
+          {isVerified && (
             <div
               className="mt-1 flex flex-col gap-0.5"
               data-ocid="profile.owner_bio_lines"
@@ -1163,7 +1199,7 @@ function PostCard({
       <div className="px-5 pt-4 pb-3">
         <div className="flex items-start justify-between gap-4">
           <p className="text-sm text-foreground leading-relaxed flex-1 min-w-0 break-words">
-            {post.content}
+            {renderPostContent(post.content)}
           </p>
           <div className="flex items-center gap-1 shrink-0">
             {post.visibility === Visibility.followersOnly && (

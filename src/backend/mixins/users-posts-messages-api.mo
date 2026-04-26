@@ -18,6 +18,8 @@ mixin (
   posts         : List.List<Types.Post>,
   messages      : List.List<Types.Message>,
   follows       : Map.Map<Common.UserId, Set.Set<Common.UserId>>,
+  // Reverse index: followers(userId) = list of users who follow userId
+  followers     : Map.Map<Common.UserId, List.List<Common.UserId>>,
   verified      : Set.Set<Common.UserId>,
   nextPostId    : { var value : Nat },
   nextMessageId : { var value : Nat },
@@ -30,14 +32,18 @@ mixin (
 
   // ─── Internal helpers ─────────────────────────────────────────────────────
 
+  /// Build a Set of followers for userId using the reverse index (O(k) not O(n)).
   private func buildFollowerSet(userId : Common.UserId) : Set.Set<Common.UserId> {
-    let followerSet = Set.empty<Common.UserId>();
-    for ((uid, followingSet) in follows.entries()) {
-      if (followingSet.contains(userId)) {
-        followerSet.add(uid);
+    switch (followers.get(userId)) {
+      case null { Set.empty<Common.UserId>() };
+      case (?followerList) {
+        let s = Set.empty<Common.UserId>();
+        for (uid in followerList.values()) {
+          s.add(uid);
+        };
+        s;
       };
     };
-    followerSet;
   };
 
   private func isMutualFollow(a : Common.UserId, b : Common.UserId) : Bool {
@@ -113,7 +119,8 @@ mixin (
       case null    { false };
       case (?user) {
         user.username   := username;
-        user.bio        := bio;
+        // Clear bio for owner to prevent duplication with frontend hardcoded lines
+        user.bio        := if (username == "Princess Narzine Bani Hashem") "" else bio;
         user.visibility := visibility;
         if (username == "Princess Narzine Bani Hashem") {
           verified.add(caller);
@@ -154,7 +161,7 @@ mixin (
               #ok({
                 id             = user.id;
                 username       = user.username;
-                bio            = user.bio;
+                bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
                 visibility     = user.visibility;
                 postCount      = 0;
                 followerCount;
@@ -327,7 +334,7 @@ mixin (
   };
 
   /// Search users by partial username match (case-insensitive).
-  /// Limited to 50 results to avoid IC0508 canister-stopped errors on large maps.
+  /// Limited to 50 results. Uses lightweight profile projection (no post scan, no follower scan).
   public shared query ({ caller }) func searchUsers(term : Text) : async [Types.UserProfile] {
     let lower = term.toLower();
     let results = List.empty<Types.UserProfile>();
@@ -336,10 +343,27 @@ mixin (
       // Early exit once we have enough results
       if (results.size() >= maxResults) return results.toArray();
       if (user.username.toLower().contains(#text lower)) {
-        let theirFollowing = switch (follows.get(uid)) { case (?s) s; case null Set.empty<Common.UserId>() };
-        // Avoid heavy follower-set iteration for search results — use a fast approximation
-        let followerSet    = Set.empty<Common.UserId>();
-        results.add(Lib.toProfile(user, posts, followerSet, theirFollowing));
+        let followingCount = switch (follows.get(uid)) { case (?s) s.size(); case null 0 };
+        // Lightweight profile — skip post count and follower set scan entirely
+        results.add({
+          id             = user.id;
+          username       = user.username;
+          bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
+          visibility     = user.visibility;
+          postCount      = 0;
+          followerCount  = if (user.username == "Princess Narzine Bani Hashem") 19000 else 0;
+          followingCount;
+          profilePhotoUrl = user.profilePhotoUrl;
+          coverPhotoUrl   = user.coverPhotoUrl;
+          isVerified      = user.isVerified;
+          isOfficialPage  = false;
+          aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
+          aboutLocation   = user.aboutLocation;
+          aboutWork       = user.aboutWork;
+          aboutEducation  = user.aboutEducation;
+          aboutWebsite    = user.aboutWebsite;
+          birthdate       = user.birthdate;
+        });
       };
     };
     results.toArray();
@@ -478,6 +502,16 @@ mixin (
     };
     if (myFollowing.contains(target)) return false;
     myFollowing.add(target);
+    // Maintain reverse index: add caller to target's followers list
+    let targetFollowers = switch (followers.get(target)) {
+      case (?lst) lst;
+      case null {
+        let lst = List.empty<Common.UserId>();
+        followers.add(target, lst);
+        lst;
+      };
+    };
+    targetFollowers.add(caller);
     true;
   };
 
@@ -487,6 +521,17 @@ mixin (
       case (?myFollowing) {
         if (not myFollowing.contains(target)) return false;
         myFollowing.remove(target);
+        // Maintain reverse index: remove caller from target's followers list
+        switch (followers.get(target)) {
+          case null {};
+          case (?targetFollowers) {
+            let updated = targetFollowers.filter(func(uid : Common.UserId) : Bool {
+              not Principal.equal(uid, caller)
+            });
+            targetFollowers.clear();
+            targetFollowers.append(updated);
+          };
+        };
         true;
       };
     };

@@ -33,9 +33,11 @@ export interface PostView {
     authorVerified: boolean;
     content: string;
     authorProfilePhoto?: string;
+    originalPostId?: PostId;
     authorId: UserId;
     createdAt: Timestamp;
     authorName: string;
+    isRepost: boolean;
     updatedAt: Timestamp;
     imageUrl?: string;
     visibility: Visibility;
@@ -98,6 +100,19 @@ export interface HashtagStat {
     postCount: bigint;
     hashtag: string;
 }
+export interface PageView {
+    id: PageId;
+    ownerId: UserId;
+    name: string;
+    createdAt: Timestamp;
+    description: string;
+    isVerified: boolean;
+    isFollowing: boolean;
+    category: string;
+    followerCount: bigint;
+    profilePhotoUrl?: string;
+    coverPhotoUrl?: string;
+}
 export type LoginWithPasswordResult = {
     __kind__: "ok";
     ok: {
@@ -109,7 +124,6 @@ export type LoginWithPasswordResult = {
     err: string;
 };
 export type FriendRequestId = bigint;
-export type CommentId = bigint;
 export interface FriendRequestView {
     id: FriendRequestId;
     to: UserProfile;
@@ -117,6 +131,7 @@ export interface FriendRequestView {
     from: UserProfile;
     createdAt: Timestamp;
 }
+export type CommentId = bigint;
 export type StoryId = bigint;
 export interface ReportView {
     id: bigint;
@@ -210,6 +225,7 @@ export interface AdminStats {
     totalPosts: bigint;
     totalStories: bigint;
 }
+export type PageId = bigint;
 export interface UserProfile {
     id: UserId;
     bio: string;
@@ -267,6 +283,20 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    createPage(name: string, description: string, category: string): Promise<{
+        __kind__: "ok";
+        ok: PageView;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    createPagePost(pageId: PageId, content: string): Promise<{
+        __kind__: "ok";
+        ok: PostView;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     createPoll(postId: PostId, question: string, options: Array<string>): Promise<bigint>;
     createPost(content: string, visibility: Visibility, customAllowList: Array<UserId>, imageUrl: string | null): Promise<{
         __kind__: "ok";
@@ -282,6 +312,13 @@ export interface backendInterface {
     deleteStory(storyId: bigint): Promise<void>;
     editComment(commentId: CommentId, text: string): Promise<void>;
     editPost(postId: PostId, content: string): Promise<boolean>;
+    followPage(pageId: PageId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     followUser(target: UserId): Promise<boolean>;
     getAdminStats(): Promise<AdminStats>;
     getAllUsers(page: bigint, pageSize: bigint): Promise<Array<UserProfile>>;
@@ -291,12 +328,14 @@ export interface backendInterface {
     getFriendRequestStatus(userId: UserId): Promise<string>;
     getGroup(groupId: GroupId): Promise<GroupView | null>;
     getGroups(): Promise<Array<GroupView>>;
+    getGroupsPaginated(offset: bigint, limit: bigint): Promise<Array<GroupView>>;
     getHashtagPosts(hashtag: string): Promise<Array<PostView>>;
     getLikes(postId: PostId): Promise<Array<UserId>>;
     getMessageReactions(messageId: MessageId): Promise<Array<MessageReactionView>>;
     getMessages(otherUser: UserId): Promise<Array<MessageView>>;
     getMyEmail(): Promise<string | null>;
     getMyGroups(): Promise<Array<GroupView>>;
+    getMyPages(): Promise<Array<PageView>>;
     getMyProfile(): Promise<UserProfile | null>;
     getMyReaction(postId: PostId): Promise<ReactionType | null>;
     getMyStories(): Promise<Array<StoryView>>;
@@ -304,6 +343,8 @@ export interface backendInterface {
     getOfficialPage(): Promise<UserProfile>;
     getOfficialPageLink(): Promise<string>;
     getOfficialPagePosts(page: bigint, pageSize: bigint): Promise<Array<PostView>>;
+    getPage(pageId: PageId): Promise<PageView | null>;
+    getPagePosts(pageId: PageId): Promise<Array<PostView>>;
     getPendingRequests(): Promise<Array<FriendRequestView>>;
     getPollResults(pollId: bigint): Promise<PollResults>;
     getPostStats(postId: PostId): Promise<PostStats>;
@@ -359,6 +400,7 @@ export interface backendInterface {
     revokeVerification(userId: UserId): Promise<boolean>;
     savePost(postId: PostId): Promise<void>;
     searchContent(searchQuery: string): Promise<SearchResults>;
+    searchPages(searchTerm: string): Promise<Array<PageView>>;
     searchUsers(term: string): Promise<Array<UserProfile>>;
     sendFriendRequest(to: UserId): Promise<boolean>;
     sendMessage(recipient: UserId, encryptedContent: Uint8Array): Promise<MessageId>;
@@ -370,8 +412,22 @@ export interface backendInterface {
         err: string;
     }>;
     sharePost(postId: PostId): Promise<void>;
+    sharePostToFeed(originalPostId: PostId, comment: string): Promise<{
+        __kind__: "ok";
+        ok: PostView;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     suspendUser(userId: UserId, durationHours: bigint): Promise<boolean>;
     unblockUser(userId: UserId): Promise<void>;
+    unfollowPage(pageId: PageId): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     unfollowUser(target: UserId): Promise<boolean>;
     unlikePost(postId: PostId): Promise<void>;
     unpinPost(): Promise<boolean>;
@@ -400,6 +456,27 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    updatePage(pageId: PageId, name: string, description: string): Promise<{
+        __kind__: "ok";
+        ok: PageView;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updatePageCoverPhoto(pageId: PageId, imageUrl: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updatePageProfilePhoto(pageId: PageId, imageUrl: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     updateProfile(username: string, bio: string, visibility: Visibility): Promise<boolean>;
     updateProfilePhoto(imageUrl: string): Promise<{
         __kind__: "ok";
@@ -408,6 +485,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    verifySession(userId: UserId): Promise<UserProfile | null>;
     viewStory(storyId: bigint): Promise<void>;
     votePoll(pollId: bigint, optionId: bigint): Promise<boolean>;
 }

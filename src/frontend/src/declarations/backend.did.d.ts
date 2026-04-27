@@ -100,6 +100,20 @@ export interface NotificationView {
   'isRead' : boolean,
   'actorId' : UserId,
 }
+export type PageId = bigint;
+export interface PageView {
+  'id' : PageId,
+  'ownerId' : UserId,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'description' : string,
+  'isVerified' : boolean,
+  'isFollowing' : boolean,
+  'category' : string,
+  'followerCount' : bigint,
+  'profilePhotoUrl' : [] | [string],
+  'coverPhotoUrl' : [] | [string],
+}
 export interface PollOptionResult {
   'id' : bigint,
   'votes' : bigint,
@@ -122,9 +136,11 @@ export interface PostView {
   'authorVerified' : boolean,
   'content' : string,
   'authorProfilePhoto' : [] | [string],
+  'originalPostId' : [] | [PostId],
   'authorId' : UserId,
   'createdAt' : Timestamp,
   'authorName' : string,
+  'isRepost' : boolean,
   'updatedAt' : Timestamp,
   'imageUrl' : [] | [string],
   'visibility' : Visibility,
@@ -211,6 +227,16 @@ export interface _SERVICE {
     { 'ok' : PostId } |
       { 'err' : string }
   >,
+  'createPage' : ActorMethod<
+    [string, string, string],
+    { 'ok' : PageView } |
+      { 'err' : string }
+  >,
+  'createPagePost' : ActorMethod<
+    [PageId, string],
+    { 'ok' : PostView } |
+      { 'err' : string }
+  >,
   'createPoll' : ActorMethod<[PostId, string, Array<string>], bigint>,
   'createPost' : ActorMethod<
     [string, Visibility, Array<UserId>, [] | [string]],
@@ -224,6 +250,7 @@ export interface _SERVICE {
   'deleteStory' : ActorMethod<[bigint], undefined>,
   'editComment' : ActorMethod<[CommentId, string], undefined>,
   'editPost' : ActorMethod<[PostId, string], boolean>,
+  'followPage' : ActorMethod<[PageId], { 'ok' : null } | { 'err' : string }>,
   'followUser' : ActorMethod<[UserId], boolean>,
   'getAdminStats' : ActorMethod<[], AdminStats>,
   'getAllUsers' : ActorMethod<[bigint, bigint], Array<UserProfile>>,
@@ -233,12 +260,14 @@ export interface _SERVICE {
   'getFriendRequestStatus' : ActorMethod<[UserId], string>,
   'getGroup' : ActorMethod<[GroupId], [] | [GroupView]>,
   'getGroups' : ActorMethod<[], Array<GroupView>>,
+  'getGroupsPaginated' : ActorMethod<[bigint, bigint], Array<GroupView>>,
   'getHashtagPosts' : ActorMethod<[string], Array<PostView>>,
   'getLikes' : ActorMethod<[PostId], Array<UserId>>,
   'getMessageReactions' : ActorMethod<[MessageId], Array<MessageReactionView>>,
   'getMessages' : ActorMethod<[UserId], Array<MessageView>>,
   'getMyEmail' : ActorMethod<[], [] | [string]>,
   'getMyGroups' : ActorMethod<[], Array<GroupView>>,
+  'getMyPages' : ActorMethod<[], Array<PageView>>,
   'getMyProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getMyReaction' : ActorMethod<[PostId], [] | [ReactionType]>,
   'getMyStories' : ActorMethod<[], Array<StoryView>>,
@@ -246,6 +275,8 @@ export interface _SERVICE {
   'getOfficialPage' : ActorMethod<[], UserProfile>,
   'getOfficialPageLink' : ActorMethod<[], string>,
   'getOfficialPagePosts' : ActorMethod<[bigint, bigint], Array<PostView>>,
+  'getPage' : ActorMethod<[PageId], [] | [PageView]>,
+  'getPagePosts' : ActorMethod<[PageId], Array<PostView>>,
   'getPendingRequests' : ActorMethod<[], Array<FriendRequestView>>,
   'getPollResults' : ActorMethod<[bigint], PollResults>,
   'getPostStats' : ActorMethod<[PostId], PostStats>,
@@ -300,6 +331,7 @@ export interface _SERVICE {
   'revokeVerification' : ActorMethod<[UserId], boolean>,
   'savePost' : ActorMethod<[PostId], undefined>,
   'searchContent' : ActorMethod<[string], SearchResults>,
+  'searchPages' : ActorMethod<[string], Array<PageView>>,
   'searchUsers' : ActorMethod<[string], Array<UserProfile>>,
   'sendFriendRequest' : ActorMethod<[UserId], boolean>,
   'sendMessage' : ActorMethod<[UserId, Uint8Array], MessageId>,
@@ -309,8 +341,14 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'sharePost' : ActorMethod<[PostId], undefined>,
+  'sharePostToFeed' : ActorMethod<
+    [PostId, string],
+    { 'ok' : PostView } |
+      { 'err' : string }
+  >,
   'suspendUser' : ActorMethod<[UserId, bigint], boolean>,
   'unblockUser' : ActorMethod<[UserId], undefined>,
+  'unfollowPage' : ActorMethod<[PageId], { 'ok' : null } | { 'err' : string }>,
   'unfollowUser' : ActorMethod<[UserId], boolean>,
   'unlikePost' : ActorMethod<[PostId], undefined>,
   'unpinPost' : ActorMethod<[], boolean>,
@@ -336,12 +374,28 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'updatePage' : ActorMethod<
+    [PageId, string, string],
+    { 'ok' : PageView } |
+      { 'err' : string }
+  >,
+  'updatePageCoverPhoto' : ActorMethod<
+    [PageId, string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'updatePageProfilePhoto' : ActorMethod<
+    [PageId, string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'updateProfile' : ActorMethod<[string, string, Visibility], boolean>,
   'updateProfilePhoto' : ActorMethod<
     [string],
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'verifySession' : ActorMethod<[UserId], [] | [UserProfile]>,
   'viewStory' : ActorMethod<[bigint], undefined>,
   'votePoll' : ActorMethod<[bigint, bigint], boolean>,
 }

@@ -23,6 +23,8 @@ const mockPost = (overrides: { id: bigint; content: string; authorName: string; 
   imageUrl: undefined,
   updatedAt: overrides.createdAt,
   authorId: samplePrincipal,
+  isRepost: false,
+  originalPostId: undefined,
   ...overrides,
 });
 
@@ -241,6 +243,28 @@ export const mockBackend: backendInterface = {
   inviteMember: async () => ({ __kind__: "ok" as const, ok: true }),
   joinGroup: async () => ({ __kind__: "ok" as const, ok: true }),
   leaveGroup: async () => ({ __kind__: "ok" as const, ok: true }),
+
+  // Pages methods
+  createPage: async () => ({ __kind__: "ok" as const, ok: { id: BigInt(1), ownerId: samplePrincipal, name: "Mock Page", createdAt: BigInt(Date.now()), description: "", isVerified: false, isFollowing: false, category: "", followerCount: BigInt(0), profilePhotoUrl: undefined, coverPhotoUrl: undefined } }),
+  createPagePost: async () => ({ __kind__: "ok" as const, ok: mockPost({ id: BigInt(1), content: "", authorName: "zaren_user", visibility: Visibility.everyone, createdAt: BigInt(Date.now()) }) }),
+  followPage: async () => ({ __kind__: "ok" as const, ok: null }),
+  unfollowPage: async () => ({ __kind__: "ok" as const, ok: null }),
+  getMyPages: async () => [],
+  getPage: async () => null,
+  getPagePosts: async () => [],
+  searchPages: async () => [],
+  updatePage: async () => ({ __kind__: "ok" as const, ok: { id: BigInt(1), ownerId: samplePrincipal, name: "", createdAt: BigInt(Date.now()), description: "", isVerified: false, isFollowing: false, category: "", followerCount: BigInt(0), profilePhotoUrl: undefined, coverPhotoUrl: undefined } }),
+  updatePageCoverPhoto: async () => ({ __kind__: "ok" as const, ok: null }),
+  updatePageProfilePhoto: async () => ({ __kind__: "ok" as const, ok: null }),
+
+  // Share / repost methods
+  sharePostToFeed: async () => ({ __kind__: "ok" as const, ok: mockPost({ id: BigInt(1), content: "", authorName: "zaren_user", visibility: Visibility.everyone, createdAt: BigInt(Date.now()) }) }),
+
+  // Session verification
+  verifySession: async () => null,
+
+  // Paginated groups
+  getGroupsPaginated: async () => [],
 };
 
 // Suppress unused import warning

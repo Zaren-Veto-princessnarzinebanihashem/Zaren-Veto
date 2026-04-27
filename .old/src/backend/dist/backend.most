@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type CommentId__740647676 = Nat;
 type Comment__495386713 =
   {
@@ -109,6 +109,33 @@ type Notification__920622627 =
     notifType : NotificationType__857889678;
     recipientId : UserId__158757552
   };
+type OldPost__784581407 =
+  {
+    authorId : UserId__2049225;
+    authorName : Text;
+    var content : Text;
+    createdAt : Timestamp__817121181;
+    var customAllowList : [UserId__2049225];
+    id : PostId__1064641814;
+    var imageUrl : ?Text;
+    var isPinned : Bool;
+    var updatedAt : Timestamp__817121181;
+    visibility : Visibility__361923986
+  };
+type PageId__238379147 = Nat;
+type Page__1017569416 =
+  {
+    var category : Text;
+    var coverPhotoUrl : ?Text;
+    createdAt : Timestamp__301639476;
+    var description : Text;
+    var followerCount : Nat;
+    id : PageId__238379147;
+    var isVerified : Bool;
+    var name : Text;
+    ownerId : UserId__158757552;
+    var profilePhotoUrl : ?Text
+  };
 type PollId__295255594 = Nat;
 type PollOption__852629614 = {id : Nat; text : Text};
 type PollVote__953216253 =
@@ -126,6 +153,7 @@ type Poll__1055658710 =
     postId : PostId__861309770;
     question : Text
   };
+type PostId__1064641814 = Nat;
 type PostId__861309770 = Nat;
 type Post__677268252 =
   {
@@ -137,6 +165,8 @@ type Post__677268252 =
     id : PostId__861309770;
     var imageUrl : ?Text;
     var isPinned : Bool;
+    var isRepost : Bool;
+    var originalPostId : ?PostId__861309770;
     var updatedAt : Timestamp__301639476;
     visibility : Visibility__499707805
   };
@@ -176,7 +206,9 @@ type Story__838062551 =
     var views : [UserId__158757552]
   };
 type Timestamp__301639476 = Int;
+type Timestamp__817121181 = Int;
 type UserId__158757552 = Principal;
+type UserId__2049225 = Principal;
 type User__411373797 =
   {
     var aboutBio : ?Text;
@@ -200,9 +232,11 @@ type User__411373797 =
     var username : Text;
     var visibility : Visibility__499707805
   };
+type Visibility__361923986 =
+  {#customList; #everyone; #followersOnly; #friendsOnly};
 type Visibility__499707805 =
   {#customList; #everyone; #followersOnly; #friendsOnly};
-actor {
+actor ({
   stable blockedUsers :
     {
       var root :
@@ -271,6 +305,171 @@ actor {
   stable nextGroupId : {var value : Nat};
   stable nextMessageId : {var value : Nat};
   stable nextNotifId : {var value : Nat};
+  stable nextPageId : {var value : Nat};
+  stable nextPagePostId : {var value : Nat};
+  stable nextPollId : {var value : Nat};
+  stable nextPostId : {var value : Nat};
+  stable nextReportId : {var value : Nat};
+  stable nextStoryId : {var value : Nat};
+  stable notifications :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Notification__920622627]];
+      var elementIndex : Nat__490723111
+    };
+  in officialPagePosts : List__415060402<OldPost__784581407>;
+  stable pageFollowers :
+    {
+      var root :
+        Node__46230540<PageId__238379147, Set__532252804<UserId__158757552>>;
+      var size : Nat__490723111
+    };
+  stable pagePosts :
+    {
+      var root :
+        Node__46230540<PageId__238379147, List__415060402<Post__677268252>>;
+      var size : Nat__490723111
+    };
+  stable pages :
+    {
+      var root : Node__46230540<PageId__238379147, Page__1017569416>;
+      var size : Nat__490723111
+    };
+  stable pinnedPosts :
+    {
+      var root : Node__46230540<UserId__158757552, PostId__861309770>;
+      var size : Nat__490723111
+    };
+  stable pollVotes :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?PollVote__953216253]];
+      var elementIndex : Nat__490723111
+    };
+  stable polls :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Poll__1055658710]];
+      var elementIndex : Nat__490723111
+    };
+  stable postCommentsIndex :
+    {
+      var root :
+        Node__46230540<PostId__861309770,
+                        List__415060402<CommentId__740647676>>;
+      var size : Nat__490723111
+    };
+  in posts : List__415060402<OldPost__784581407>;
+  stable reactions :
+    {
+      var root :
+        Node__46230540<PostId__861309770,
+                        Map__605269027<UserId__158757552,
+                                        ReactionType__110811559>>;
+      var size : Nat__490723111
+    };
+  stable reports :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Report__833543126]];
+      var elementIndex : Nat__490723111
+    };
+  stable savedPosts :
+    {
+      var root :
+        Node__46230540<UserId__158757552, Set__532252804<PostId__861309770>>;
+      var size : Nat__490723111
+    };
+  stable shares :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Share__777168058]];
+      var elementIndex : Nat__490723111
+    };
+  stable stories :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Story__838062551]];
+      var elementIndex : Nat__490723111
+    };
+  stable users :
+    {
+      var root : Node__46230540<UserId__158757552, User__411373797>;
+      var size : Nat__490723111
+    };
+  stable verified :
+    {var root : Node__92254746<UserId__158757552>; var size : Nat__490723111}
+}, {
+  stable blockedUsers :
+    {
+      var root :
+        Node__46230540<UserId__158757552, Set__532252804<UserId__158757552>>;
+      var size : Nat__490723111
+    };
+  stable comments :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Comment__495386713]];
+      var elementIndex : Nat__490723111
+    };
+  stable followers :
+    {
+      var root :
+        Node__46230540<UserId__158757552, List__415060402<UserId__158757552>>;
+      var size : Nat__490723111
+    };
+  stable follows :
+    {
+      var root :
+        Node__46230540<UserId__158757552, Set__532252804<UserId__158757552>>;
+      var size : Nat__490723111
+    };
+  stable friendRequests :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?FriendRequest__180764053]];
+      var elementIndex : Nat__490723111
+    };
+  stable groups :
+    {
+      var root : Node__46230540<GroupId__724235155, Group__533693579>;
+      var size : Nat__490723111
+    };
+  stable hashtagIndex :
+    {
+      var root : Node__46230540<Text, List__415060402<PostId__861309770>>;
+      var size : Nat__490723111
+    };
+  stable hashtagPostTime :
+    {
+      var root : Node__46230540<Text, List__415060402<Timestamp__301639476>>;
+      var size : Nat__490723111
+    };
+  stable likes :
+    {
+      var root :
+        Node__46230540<PostId__861309770, Set__532252804<UserId__158757552>>;
+      var size : Nat__490723111
+    };
+  stable messages :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Message__211416617]];
+      var elementIndex : Nat__490723111
+    };
+  stable msgReactions :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?MessageReaction__11955573]];
+      var elementIndex : Nat__490723111
+    };
+  stable nextCommentId : {var value : Nat};
+  stable nextFriendReqId : {var value : Nat};
+  stable nextGroupId : {var value : Nat};
+  stable nextMessageId : {var value : Nat};
+  stable nextNotifId : {var value : Nat};
+  stable nextPageId : {var value : Nat};
+  stable nextPagePostId : {var value : Nat};
   stable nextPollId : {var value : Nat};
   stable nextPostId : {var value : Nat};
   stable nextReportId : {var value : Nat};
@@ -286,6 +485,23 @@ actor {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Post__677268252]];
       var elementIndex : Nat__490723111
+    };
+  stable pageFollowers :
+    {
+      var root :
+        Node__46230540<PageId__238379147, Set__532252804<UserId__158757552>>;
+      var size : Nat__490723111
+    };
+  stable pagePosts :
+    {
+      var root :
+        Node__46230540<PageId__238379147, List__415060402<Post__677268252>>;
+      var size : Nat__490723111
+    };
+  stable pages :
+    {
+      var root : Node__46230540<PageId__238379147, Page__1017569416>;
+      var size : Nat__490723111
     };
   stable pinnedPosts :
     {
@@ -356,4 +572,4 @@ actor {
     };
   stable verified :
     {var root : Node__92254746<UserId__158757552>; var size : Nat__490723111}
-};
+}) ;

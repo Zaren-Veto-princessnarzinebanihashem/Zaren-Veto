@@ -100,6 +100,8 @@ const StoriesPage = lazy(() => import("./pages/StoriesPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const FriendsPage = lazy(() => import("./pages/FriendsPage"));
 const GroupsPage = lazy(() => import("./pages/GroupsPage"));
+const PagesPage = lazy(() => import("./pages/PagesPage"));
+const PageDetailPage = lazy(() => import("./pages/PageDetailPage"));
 
 function PageFallback() {
   return (
@@ -233,6 +235,18 @@ const groupsRoute = createRoute({
   component: () => withSuspense(GroupsPage),
 });
 
+const pagesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pages",
+  component: () => withSuspense(PagesPage),
+});
+
+const pageDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/pages/$pageId",
+  component: () => withSuspense(PageDetailPage),
+});
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   feedRoute,
@@ -249,6 +263,8 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   friendsRoute,
   groupsRoute,
+  pagesRoute,
+  pageDetailRoute,
 ]);
 
 const router = createRouter({ routeTree });

@@ -6,13 +6,15 @@ import Types "types/users-posts-messages";
 import EngTypes "types/engagement";
 import NewTypes "types/stories-hashtags-friendrequests-polls-admin";
 import GroupTypes "types/groups";
+import PageTypes "types/pages";
 import UPMApi "mixins/users-posts-messages-api";
 import EngApi "mixins/engagement-api";
 import NewApi "mixins/stories-hashtags-friendrequests-polls-admin-api";
 import GroupsApi "mixins/groups-api";
+import PagesApi "mixins/pages-api";
+import Migration "migration";
 
-
-
+(with migration = Migration.run)
 actor {
   // ─── Users / Posts / Messages state ──────────────────────────────────────
   let users         : Map.Map<Common.UserId, Types.User>                   = Map.empty();
@@ -72,6 +74,13 @@ actor {
   let groups        : Map.Map<GroupTypes.GroupId, GroupTypes.Group>        = Map.empty();
   let nextGroupId   : { var value : Nat }                                  = { var value = 0 };
 
+  // ─── Pages state ─────────────────────────────────────────────────────────
+  let pages          : Map.Map<PageTypes.PageId, PageTypes.Page>                    = Map.empty();
+  let pageFollowers  : Map.Map<PageTypes.PageId, Set.Set<Common.UserId>>            = Map.empty();
+  let pagePosts      : Map.Map<PageTypes.PageId, List.List<Types.Post>>             = Map.empty();
+  let nextPageId     : { var value : Nat }                                          = { var value = 0 };
+  let nextPagePostId : { var value : Nat }                                          = { var value = 0 };
+
   // ─── Mixin composition ────────────────────────────────────────────────────
   include UPMApi(users, posts, messages, follows, followers, verified, nextPostId, nextMessageId,
                  hashtagIndex, hashtagPostTime, officialPagePosts);
@@ -91,4 +100,6 @@ actor {
   );
 
   include GroupsApi(groups, nextGroupId, users);
+
+  include PagesApi(pages, pageFollowers, pagePosts, nextPageId, nextPagePostId, users);
 };

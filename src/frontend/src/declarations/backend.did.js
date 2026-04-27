@@ -30,11 +30,40 @@ export const CreateGroupResult = IDL.Variant({
   'ok' : GroupView,
   'err' : IDL.Text,
 });
+export const PageId = IDL.Nat;
+export const PageView = IDL.Record({
+  'id' : PageId,
+  'ownerId' : UserId,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'description' : IDL.Text,
+  'isVerified' : IDL.Bool,
+  'isFollowing' : IDL.Bool,
+  'category' : IDL.Text,
+  'followerCount' : IDL.Nat,
+  'profilePhotoUrl' : IDL.Opt(IDL.Text),
+  'coverPhotoUrl' : IDL.Opt(IDL.Text),
+});
 export const Visibility = IDL.Variant({
   'everyone' : IDL.Null,
   'followersOnly' : IDL.Null,
   'friendsOnly' : IDL.Null,
   'customList' : IDL.Null,
+});
+export const PostView = IDL.Record({
+  'id' : PostId,
+  'authorVerified' : IDL.Bool,
+  'content' : IDL.Text,
+  'authorProfilePhoto' : IDL.Opt(IDL.Text),
+  'originalPostId' : IDL.Opt(PostId),
+  'authorId' : UserId,
+  'createdAt' : Timestamp,
+  'authorName' : IDL.Text,
+  'isRepost' : IDL.Bool,
+  'updatedAt' : Timestamp,
+  'imageUrl' : IDL.Opt(IDL.Text),
+  'visibility' : Visibility,
+  'isPinned' : IDL.Bool,
 });
 export const StoryId = IDL.Nat;
 export const UserProfile = IDL.Record({
@@ -92,19 +121,6 @@ export const ConversationSummary = IDL.Record({
   'lastMessagePreview' : IDL.Text,
   'otherUserId' : UserId,
   'conversationId' : ConversationId,
-});
-export const PostView = IDL.Record({
-  'id' : PostId,
-  'authorVerified' : IDL.Bool,
-  'content' : IDL.Text,
-  'authorProfilePhoto' : IDL.Opt(IDL.Text),
-  'authorId' : UserId,
-  'createdAt' : Timestamp,
-  'authorName' : IDL.Text,
-  'updatedAt' : Timestamp,
-  'imageUrl' : IDL.Opt(IDL.Text),
-  'visibility' : Visibility,
-  'isPinned' : IDL.Bool,
 });
 export const MessageId = IDL.Nat;
 export const MessageReactionView = IDL.Record({
@@ -228,6 +244,16 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : PostId, 'err' : IDL.Text })],
       [],
     ),
+  'createPage' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : PageView, 'err' : IDL.Text })],
+      [],
+    ),
+  'createPagePost' : IDL.Func(
+      [PageId, IDL.Text],
+      [IDL.Variant({ 'ok' : PostView, 'err' : IDL.Text })],
+      [],
+    ),
   'createPoll' : IDL.Func([PostId, IDL.Text, IDL.Vec(IDL.Text)], [IDL.Nat], []),
   'createPost' : IDL.Func(
       [IDL.Text, Visibility, IDL.Vec(UserId), IDL.Opt(IDL.Text)],
@@ -241,6 +267,11 @@ export const idlService = IDL.Service({
   'deleteStory' : IDL.Func([IDL.Nat], [], []),
   'editComment' : IDL.Func([CommentId, IDL.Text], [], []),
   'editPost' : IDL.Func([PostId, IDL.Text], [IDL.Bool], []),
+  'followPage' : IDL.Func(
+      [PageId],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'followUser' : IDL.Func([UserId], [IDL.Bool], []),
   'getAdminStats' : IDL.Func([], [AdminStats], ['query']),
   'getAllUsers' : IDL.Func(
@@ -254,6 +285,11 @@ export const idlService = IDL.Service({
   'getFriendRequestStatus' : IDL.Func([UserId], [IDL.Text], ['query']),
   'getGroup' : IDL.Func([GroupId], [IDL.Opt(GroupView)], ['query']),
   'getGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
+  'getGroupsPaginated' : IDL.Func(
+      [IDL.Nat, IDL.Nat],
+      [IDL.Vec(GroupView)],
+      ['query'],
+    ),
   'getHashtagPosts' : IDL.Func([IDL.Text], [IDL.Vec(PostView)], ['query']),
   'getLikes' : IDL.Func([PostId], [IDL.Vec(UserId)], ['query']),
   'getMessageReactions' : IDL.Func(
@@ -264,6 +300,7 @@ export const idlService = IDL.Service({
   'getMessages' : IDL.Func([UserId], [IDL.Vec(MessageView)], ['query']),
   'getMyEmail' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
   'getMyGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
+  'getMyPages' : IDL.Func([], [IDL.Vec(PageView)], ['query']),
   'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getMyReaction' : IDL.Func([PostId], [IDL.Opt(ReactionType)], []),
   'getMyStories' : IDL.Func([], [IDL.Vec(StoryView)], ['query']),
@@ -275,6 +312,8 @@ export const idlService = IDL.Service({
       [IDL.Vec(PostView)],
       ['query'],
     ),
+  'getPage' : IDL.Func([PageId], [IDL.Opt(PageView)], ['query']),
+  'getPagePosts' : IDL.Func([PageId], [IDL.Vec(PostView)], ['query']),
   'getPendingRequests' : IDL.Func([], [IDL.Vec(FriendRequestView)], ['query']),
   'getPollResults' : IDL.Func([IDL.Nat], [PollResults], ['query']),
   'getPostStats' : IDL.Func([PostId], [PostStats], ['query']),
@@ -334,6 +373,7 @@ export const idlService = IDL.Service({
   'revokeVerification' : IDL.Func([UserId], [IDL.Bool], []),
   'savePost' : IDL.Func([PostId], [], []),
   'searchContent' : IDL.Func([IDL.Text], [SearchResults], ['query']),
+  'searchPages' : IDL.Func([IDL.Text], [IDL.Vec(PageView)], ['query']),
   'searchUsers' : IDL.Func([IDL.Text], [IDL.Vec(UserProfile)], ['query']),
   'sendFriendRequest' : IDL.Func([UserId], [IDL.Bool], []),
   'sendMessage' : IDL.Func([UserId, IDL.Vec(IDL.Nat8)], [MessageId], []),
@@ -343,8 +383,18 @@ export const idlService = IDL.Service({
       [],
     ),
   'sharePost' : IDL.Func([PostId], [], []),
+  'sharePostToFeed' : IDL.Func(
+      [PostId, IDL.Text],
+      [IDL.Variant({ 'ok' : PostView, 'err' : IDL.Text })],
+      [],
+    ),
   'suspendUser' : IDL.Func([UserId, IDL.Nat], [IDL.Bool], []),
   'unblockUser' : IDL.Func([UserId], [], []),
+  'unfollowPage' : IDL.Func(
+      [PageId],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'unfollowUser' : IDL.Func([UserId], [IDL.Bool], []),
   'unlikePost' : IDL.Func([PostId], [], []),
   'unpinPost' : IDL.Func([], [IDL.Bool], []),
@@ -377,12 +427,28 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'updatePage' : IDL.Func(
+      [PageId, IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : PageView, 'err' : IDL.Text })],
+      [],
+    ),
+  'updatePageCoverPhoto' : IDL.Func(
+      [PageId, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'updatePageProfilePhoto' : IDL.Func(
+      [PageId, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
   'updateProfile' : IDL.Func([IDL.Text, IDL.Text, Visibility], [IDL.Bool], []),
   'updateProfilePhoto' : IDL.Func(
       [IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'verifySession' : IDL.Func([UserId], [IDL.Opt(UserProfile)], ['query']),
   'viewStory' : IDL.Func([IDL.Nat], [], []),
   'votePoll' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
 });
@@ -409,11 +475,40 @@ export const idlFactory = ({ IDL }) => {
     'ownerUsername' : IDL.Text,
   });
   const CreateGroupResult = IDL.Variant({ 'ok' : GroupView, 'err' : IDL.Text });
+  const PageId = IDL.Nat;
+  const PageView = IDL.Record({
+    'id' : PageId,
+    'ownerId' : UserId,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'description' : IDL.Text,
+    'isVerified' : IDL.Bool,
+    'isFollowing' : IDL.Bool,
+    'category' : IDL.Text,
+    'followerCount' : IDL.Nat,
+    'profilePhotoUrl' : IDL.Opt(IDL.Text),
+    'coverPhotoUrl' : IDL.Opt(IDL.Text),
+  });
   const Visibility = IDL.Variant({
     'everyone' : IDL.Null,
     'followersOnly' : IDL.Null,
     'friendsOnly' : IDL.Null,
     'customList' : IDL.Null,
+  });
+  const PostView = IDL.Record({
+    'id' : PostId,
+    'authorVerified' : IDL.Bool,
+    'content' : IDL.Text,
+    'authorProfilePhoto' : IDL.Opt(IDL.Text),
+    'originalPostId' : IDL.Opt(PostId),
+    'authorId' : UserId,
+    'createdAt' : Timestamp,
+    'authorName' : IDL.Text,
+    'isRepost' : IDL.Bool,
+    'updatedAt' : Timestamp,
+    'imageUrl' : IDL.Opt(IDL.Text),
+    'visibility' : Visibility,
+    'isPinned' : IDL.Bool,
   });
   const StoryId = IDL.Nat;
   const UserProfile = IDL.Record({
@@ -471,19 +566,6 @@ export const idlFactory = ({ IDL }) => {
     'lastMessagePreview' : IDL.Text,
     'otherUserId' : UserId,
     'conversationId' : ConversationId,
-  });
-  const PostView = IDL.Record({
-    'id' : PostId,
-    'authorVerified' : IDL.Bool,
-    'content' : IDL.Text,
-    'authorProfilePhoto' : IDL.Opt(IDL.Text),
-    'authorId' : UserId,
-    'createdAt' : Timestamp,
-    'authorName' : IDL.Text,
-    'updatedAt' : Timestamp,
-    'imageUrl' : IDL.Opt(IDL.Text),
-    'visibility' : Visibility,
-    'isPinned' : IDL.Bool,
   });
   const MessageId = IDL.Nat;
   const MessageReactionView = IDL.Record({
@@ -607,6 +689,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : PostId, 'err' : IDL.Text })],
         [],
       ),
+    'createPage' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : PageView, 'err' : IDL.Text })],
+        [],
+      ),
+    'createPagePost' : IDL.Func(
+        [PageId, IDL.Text],
+        [IDL.Variant({ 'ok' : PostView, 'err' : IDL.Text })],
+        [],
+      ),
     'createPoll' : IDL.Func(
         [PostId, IDL.Text, IDL.Vec(IDL.Text)],
         [IDL.Nat],
@@ -624,6 +716,11 @@ export const idlFactory = ({ IDL }) => {
     'deleteStory' : IDL.Func([IDL.Nat], [], []),
     'editComment' : IDL.Func([CommentId, IDL.Text], [], []),
     'editPost' : IDL.Func([PostId, IDL.Text], [IDL.Bool], []),
+    'followPage' : IDL.Func(
+        [PageId],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'followUser' : IDL.Func([UserId], [IDL.Bool], []),
     'getAdminStats' : IDL.Func([], [AdminStats], ['query']),
     'getAllUsers' : IDL.Func(
@@ -641,6 +738,11 @@ export const idlFactory = ({ IDL }) => {
     'getFriendRequestStatus' : IDL.Func([UserId], [IDL.Text], ['query']),
     'getGroup' : IDL.Func([GroupId], [IDL.Opt(GroupView)], ['query']),
     'getGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
+    'getGroupsPaginated' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [IDL.Vec(GroupView)],
+        ['query'],
+      ),
     'getHashtagPosts' : IDL.Func([IDL.Text], [IDL.Vec(PostView)], ['query']),
     'getLikes' : IDL.Func([PostId], [IDL.Vec(UserId)], ['query']),
     'getMessageReactions' : IDL.Func(
@@ -651,6 +753,7 @@ export const idlFactory = ({ IDL }) => {
     'getMessages' : IDL.Func([UserId], [IDL.Vec(MessageView)], ['query']),
     'getMyEmail' : IDL.Func([], [IDL.Opt(IDL.Text)], ['query']),
     'getMyGroups' : IDL.Func([], [IDL.Vec(GroupView)], ['query']),
+    'getMyPages' : IDL.Func([], [IDL.Vec(PageView)], ['query']),
     'getMyProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getMyReaction' : IDL.Func([PostId], [IDL.Opt(ReactionType)], []),
     'getMyStories' : IDL.Func([], [IDL.Vec(StoryView)], ['query']),
@@ -662,6 +765,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(PostView)],
         ['query'],
       ),
+    'getPage' : IDL.Func([PageId], [IDL.Opt(PageView)], ['query']),
+    'getPagePosts' : IDL.Func([PageId], [IDL.Vec(PostView)], ['query']),
     'getPendingRequests' : IDL.Func(
         [],
         [IDL.Vec(FriendRequestView)],
@@ -729,6 +834,7 @@ export const idlFactory = ({ IDL }) => {
     'revokeVerification' : IDL.Func([UserId], [IDL.Bool], []),
     'savePost' : IDL.Func([PostId], [], []),
     'searchContent' : IDL.Func([IDL.Text], [SearchResults], ['query']),
+    'searchPages' : IDL.Func([IDL.Text], [IDL.Vec(PageView)], ['query']),
     'searchUsers' : IDL.Func([IDL.Text], [IDL.Vec(UserProfile)], ['query']),
     'sendFriendRequest' : IDL.Func([UserId], [IDL.Bool], []),
     'sendMessage' : IDL.Func([UserId, IDL.Vec(IDL.Nat8)], [MessageId], []),
@@ -738,8 +844,18 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'sharePost' : IDL.Func([PostId], [], []),
+    'sharePostToFeed' : IDL.Func(
+        [PostId, IDL.Text],
+        [IDL.Variant({ 'ok' : PostView, 'err' : IDL.Text })],
+        [],
+      ),
     'suspendUser' : IDL.Func([UserId, IDL.Nat], [IDL.Bool], []),
     'unblockUser' : IDL.Func([UserId], [], []),
+    'unfollowPage' : IDL.Func(
+        [PageId],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'unfollowUser' : IDL.Func([UserId], [IDL.Bool], []),
     'unlikePost' : IDL.Func([PostId], [], []),
     'unpinPost' : IDL.Func([], [IDL.Bool], []),
@@ -772,6 +888,21 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'updatePage' : IDL.Func(
+        [PageId, IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : PageView, 'err' : IDL.Text })],
+        [],
+      ),
+    'updatePageCoverPhoto' : IDL.Func(
+        [PageId, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'updatePageProfilePhoto' : IDL.Func(
+        [PageId, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
     'updateProfile' : IDL.Func(
         [IDL.Text, IDL.Text, Visibility],
         [IDL.Bool],
@@ -782,6 +913,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'verifySession' : IDL.Func([UserId], [IDL.Opt(UserProfile)], ['query']),
     'viewStory' : IDL.Func([IDL.Nat], [], []),
     'votePoll' : IDL.Func([IDL.Nat, IDL.Nat], [IDL.Bool], []),
   });

@@ -70,6 +70,9 @@ module {
     var updatedAt  : Common.Timestamp;
     var isPinned   : Bool;
     var imageUrl   : ?Text;
+    // Repost fields
+    var isRepost        : Bool;
+    var originalPostId  : ?Common.PostId;
   };
 
   // Shared projection of Post (poll summary injected at API layer)
@@ -85,6 +88,8 @@ module {
     imageUrl   : ?Text;
     authorVerified : Bool;
     authorProfilePhoto : ?Text;
+    isRepost       : Bool;
+    originalPostId : ?Common.PostId;
   };
 
   // ─── Message ──────────────────────────────────────────────────────────────

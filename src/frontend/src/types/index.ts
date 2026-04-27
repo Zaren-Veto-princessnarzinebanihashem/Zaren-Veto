@@ -21,6 +21,7 @@ export type {
   MessageReactionView,
   CommentView,
   NotificationView,
+  GroupView,
 } from "../backend";
 
 export {

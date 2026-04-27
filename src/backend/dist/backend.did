@@ -93,6 +93,8 @@ type PostView =
    id: PostId;
    imageUrl: opt text;
    isPinned: bool;
+   isRepost: bool;
+   originalPostId: opt PostId;
    updatedAt: Timestamp;
    visibility: Visibility;
  };
@@ -116,6 +118,21 @@ type PollOptionResult =
    "text": text;
    votes: nat;
  };
+type PageView = 
+ record {
+   category: text;
+   coverPhotoUrl: opt text;
+   createdAt: Timestamp;
+   description: text;
+   followerCount: nat;
+   id: PageId;
+   isFollowing: bool;
+   isVerified: bool;
+   name: text;
+   ownerId: UserId;
+   profilePhotoUrl: opt text;
+ };
+type PageId = nat;
 type NotificationView = 
  record {
    actorId: UserId;
@@ -249,6 +266,16 @@ service : {
       err: text;
       ok: PostId;
     });
+  createPage: (name: text, description: text, category: text) ->
+   (variant {
+      err: text;
+      ok: PageView;
+    });
+  createPagePost: (pageId: PageId, content: text) ->
+   (variant {
+      err: text;
+      ok: PostView;
+    });
   createPoll: (postId: PostId, question: text, options: vec text) -> (nat);
   createPost: (content: text, visibility: Visibility, customAllowList:
    vec UserId, imageUrl: opt text) -> (variant {
@@ -262,6 +289,10 @@ service : {
   deleteStory: (storyId: nat) -> ();
   editComment: (commentId: CommentId, "text": text) -> ();
   editPost: (postId: PostId, content: text) -> (bool);
+  followPage: (pageId: PageId) -> (variant {
+                                     err: text;
+                                     ok;
+                                   });
   followUser: (target: UserId) -> (bool);
   getAdminStats: () -> (AdminStats) query;
   getAllUsers: (page: nat, pageSize: nat) -> (vec UserProfile) query;
@@ -271,6 +302,7 @@ service : {
   getFriendRequestStatus: (userId: UserId) -> (text) query;
   getGroup: (groupId: GroupId) -> (opt GroupView) query;
   getGroups: () -> (vec GroupView) query;
+  getGroupsPaginated: (offset: nat, limit: nat) -> (vec GroupView) query;
   getHashtagPosts: (hashtag: text) -> (vec PostView) query;
   getLikes: (postId: PostId) -> (vec UserId) query;
   getMessageReactions: (messageId: MessageId) ->
@@ -278,6 +310,7 @@ service : {
   getMessages: (otherUser: UserId) -> (vec MessageView) query;
   getMyEmail: () -> (opt text) query;
   getMyGroups: () -> (vec GroupView) query;
+  getMyPages: () -> (vec PageView) query;
   getMyProfile: () -> (opt UserProfile) query;
   getMyReaction: (postId: PostId) -> (opt ReactionType);
   getMyStories: () -> (vec StoryView) query;
@@ -285,6 +318,8 @@ service : {
   getOfficialPage: () -> (UserProfile) query;
   getOfficialPageLink: () -> (text) query;
   getOfficialPagePosts: (page: nat, pageSize: nat) -> (vec PostView) query;
+  getPage: (pageId: PageId) -> (opt PageView) query;
+  getPagePosts: (pageId: PageId) -> (vec PostView) query;
   getPendingRequests: () -> (vec FriendRequestView) query;
   getPollResults: (pollId: nat) -> (PollResults) query;
   getPostStats: (postId: PostId) -> (PostStats) query;
@@ -340,6 +375,7 @@ service : {
   revokeVerification: (userId: UserId) -> (bool);
   savePost: (postId: PostId) -> ();
   searchContent: (searchQuery: text) -> (SearchResults) query;
+  searchPages: (searchTerm: text) -> (vec PageView) query;
   searchUsers: (term: text) -> (vec UserProfile) query;
   sendFriendRequest: (to: UserId) -> (bool);
   sendMessage: (recipient: UserId, encryptedContent: blob) -> (MessageId);
@@ -348,8 +384,17 @@ service : {
                                            ok: bool;
                                          });
   sharePost: (postId: PostId) -> ();
+  sharePostToFeed: (originalPostId: PostId, comment: text) ->
+   (variant {
+      err: text;
+      ok: PostView;
+    });
   suspendUser: (userId: UserId, durationHours: nat) -> (bool);
   unblockUser: (userId: UserId) -> ();
+  unfollowPage: (pageId: PageId) -> (variant {
+                                       err: text;
+                                       ok;
+                                     });
   unfollowUser: (target: UserId) -> (bool);
   unlikePost: (postId: PostId) -> ();
   unpinPost: () -> (bool);
@@ -371,12 +416,28 @@ service : {
       err: text;
       ok;
     });
+  updatePage: (pageId: PageId, name: text, description: text) ->
+   (variant {
+      err: text;
+      ok: PageView;
+    });
+  updatePageCoverPhoto: (pageId: PageId, imageUrl: text) ->
+   (variant {
+      err: text;
+      ok;
+    });
+  updatePageProfilePhoto: (pageId: PageId, imageUrl: text) ->
+   (variant {
+      err: text;
+      ok;
+    });
   updateProfile: (username: text, bio: text, visibility: Visibility) ->
    (bool);
   updateProfilePhoto: (imageUrl: text) -> (variant {
                                              err: text;
                                              ok;
                                            });
+  verifySession: (userId: UserId) -> (opt UserProfile) query;
   viewStory: (storyId: nat) -> ();
   votePoll: (pollId: nat, optionId: nat) -> (bool);
 }

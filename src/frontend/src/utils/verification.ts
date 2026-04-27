@@ -24,11 +24,24 @@ function normalizeUsername(name: string): string {
 }
 
 /**
+ * All known patterns for the owner's username.
+ * The owner may have registered with any of these.
+ */
+const OWNER_PATTERNS = [
+  "islambouharabnarzinebanihasheminhome",
+  "princessnarzinebanihashem",
+  "narzinebanihashem",
+  "princessnarzine",
+  "islambouharabnarzine",
+  "narzine",
+];
+
+/**
  * Returns true if the user should display a verification badge.
  *
  * Priority:
  * 1. `isVerifiedFromBackend === true`  (backend explicitly granted verification)
- * 2. Username matches the owner "Princess Narzine Bani Hashem"
+ * 2. Username matches any known owner pattern
  *    (case-insensitive, ignoring spaces/underscores/hyphens)
  */
 export function isVerifiedUser(
@@ -38,11 +51,7 @@ export function isVerifiedUser(
   if (isVerifiedFromBackend === true) return true;
   if (!username) return false;
   const normalized = normalizeUsername(username);
-  return (
-    normalized === "princessnarzinebanihashem" ||
-    normalized === "princessnarzine" ||
-    normalized === "narzinebanihashem"
-  );
+  return OWNER_PATTERNS.some((p) => normalized === p || normalized.includes(p));
 }
 
 /**

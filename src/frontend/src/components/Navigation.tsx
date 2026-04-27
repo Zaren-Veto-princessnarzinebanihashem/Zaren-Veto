@@ -3,6 +3,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { cn } from "@/lib/utils";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+  BookOpen,
   Compass,
   Home,
   MessageCircle,
@@ -78,6 +79,7 @@ export function Navigation({ mobileOnly = false }: NavigationProps) {
     },
     { to: "/friends", label: t.friends, icon: Users, ocid: "nav-friends" },
     { to: "/groups", label: "Groupes", icon: UsersRound, ocid: "nav-groups" },
+    { to: "/pages", label: "Pages", icon: BookOpen, ocid: "nav-pages" },
     {
       to: "/settings",
       label: t.settings,

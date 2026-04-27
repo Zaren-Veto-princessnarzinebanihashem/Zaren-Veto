@@ -63,11 +63,28 @@ mixin (
 
   // ─── Read ─────────────────────────────────────────────────────────────────
 
-  /// Return all groups, with isMember flag for the caller.
+  /// Return all groups, with isMember flag for the caller. Limited to 50.
   public shared query ({ caller }) func getGroups() : async [Types.GroupView] {
     let result = List.empty<Types.GroupView>();
     for ((_, group) in groups.entries()) {
+      if (result.size() >= 50) return result.toArray();
       result.add(Lib.groupToView(group, caller));
+    };
+    result.toArray();
+  };
+
+  /// Return paginated groups.
+  public shared query ({ caller }) func getGroupsPaginated(offset : Nat, limit : Nat) : async [Types.GroupView] {
+    let safeLimit = if (limit > 50) 50 else limit;
+    let result = List.empty<Types.GroupView>();
+    var skipped : Nat = 0;
+    for ((_, group) in groups.entries()) {
+      if (result.size() >= safeLimit) return result.toArray();
+      if (skipped < offset) {
+        skipped += 1;
+      } else {
+        result.add(Lib.groupToView(group, caller));
+      };
     };
     result.toArray();
   };

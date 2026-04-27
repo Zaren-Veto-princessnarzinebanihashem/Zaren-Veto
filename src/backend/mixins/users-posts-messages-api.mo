@@ -74,7 +74,8 @@ mixin (
       case null {
         // Block reserved owner name variants
         if (Lib.isReservedName(username)) return false;
-        let user = Lib.newUser(caller, username, bio);
+        let safeBio = Lib.sanitizeOwnerBio(bio);
+        let user = Lib.newUser(caller, username, safeBio);
         // Auto-verify the owner account
         if (username == "Princess Narzine Bani Hashem") {
           verified.add(caller);
@@ -119,8 +120,9 @@ mixin (
       case null    { false };
       case (?user) {
         user.username   := username;
-        // Clear bio for owner to prevent duplication with frontend hardcoded lines
-        user.bio        := if (username == "Princess Narzine Bani Hashem") "" else bio;
+        // Sanitize bio — for reserved names always empty; for others strip forbidden words
+        let isOwner = Lib.isReservedName(username);
+        user.bio        := if (isOwner) "" else Lib.sanitizeOwnerBio(bio);
         user.visibility := visibility;
         if (username == "Princess Narzine Bani Hashem") {
           verified.add(caller);
@@ -138,10 +140,11 @@ mixin (
   /// update call — the caller's principal is used only as a session hint; the real
   /// authentication is the password comparison.
   public shared func loginWithPassword(username : Text, password : Text) : async { #ok : Types.UserProfile; #err : Text } {
-    // Find user by username
+    // Find user by username (case-insensitive normalized lookup)
+    let normSearch = Lib.normalizeUsername(username);
     var foundUser : ?Types.User = null;
     for ((_, user) in users.entries()) {
-      if (user.username == username) {
+      if (Lib.normalizeUsername(user.username) == normSearch) {
         foundUser := ?user;
       };
     };
@@ -150,18 +153,17 @@ mixin (
       case (?user) {
         switch (user.passwordHash) {
           case null {
-            // User registered via Internet Identity — no password set
             #err("This account uses Internet Identity login and does not have a password");
           };
           case (?storedHash) {
             let submittedHash = Lib.hashPassword(password);
             if (submittedHash == storedHash) {
-              // Build a minimal profile for the response
-              let followerCount : Nat = if (user.username == "Princess Narzine Bani Hashem") 19000 else 0;
+              let isOwner = Lib.isReservedName(user.username);
+              let followerCount : Nat = if (isOwner) 19000 else 0;
               #ok({
                 id             = user.id;
                 username       = user.username;
-                bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
+                bio            = if (isOwner) "" else Lib.sanitizeOwnerBio(user.bio);
                 visibility     = user.visibility;
                 postCount      = 0;
                 followerCount;
@@ -170,7 +172,7 @@ mixin (
                 coverPhotoUrl   = user.coverPhotoUrl;
                 isVerified      = user.isVerified;
                 isOfficialPage  = false;
-                aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
+                aboutBio        = if (isOwner) null else user.aboutBio;
                 aboutLocation   = user.aboutLocation;
                 aboutWork       = user.aboutWork;
                 aboutEducation  = user.aboutEducation;
@@ -193,26 +195,30 @@ mixin (
   public shared func loginWithPasswordOnly(username : Text, password : Text) : async Types.LoginWithPasswordResult {
     // Guard: password must not be empty to avoid unexpected hashing edge cases
     if (password.size() == 0) return #err("Password cannot be empty");
+    // Normalize username for lookup — case/punctuation insensitive
+    let normSearch = Lib.normalizeUsername(username);
     var foundUser : ?Types.User = null;
     for ((_, user) in users.entries()) {
-      if (user.username == username) {
+      if (Lib.normalizeUsername(user.username) == normSearch) {
         foundUser := ?user;
       };
     };
     switch (foundUser) {
       case null { #err("Invalid username or password") };
       case (?user) {
+        let isOwner = Lib.isReservedName(user.username);
         switch (user.passwordHash) {
           case null {
             // Special owner recovery: if the owner has no password set yet,
             // treat the submitted value as the new password to set (first-time setup).
-            // This lets the owner who registered via Internet Identity set a password.
-            if (user.username == "Princess Narzine Bani Hashem") {
+            if (isOwner) {
               if (not Lib.validatePassword(password)) {
                 return #err("Password must be at least 8 characters and contain at least one uppercase letter, one lowercase letter, and one digit");
               };
               // Set the password for the first time
               user.passwordHash := ?(Lib.hashPassword(password));
+              // Sanitize bio while we're here
+              if (user.bio.size() > 0) { user.bio := "" };
               let myFollowing = switch (follows.get(user.id)) { case (?s) s; case null Set.empty<Common.UserId>() };
               let profile : Types.UserProfile = {
                 id             = user.id;
@@ -240,14 +246,15 @@ mixin (
           case (?storedHash) {
             let submittedHash = Lib.hashPassword(password);
             if (submittedHash == storedHash) {
+              // Sanitize bio on every login for good measure
+              if (isOwner and user.bio.size() > 0) { user.bio := "" };
               let myFollowing = switch (follows.get(user.id)) { case (?s) s; case null Set.empty<Common.UserId>() };
-              // For login response, use lightweight follower count (avoid full scan)
-              let followerCount : Nat = if (user.username == "Princess Narzine Bani Hashem") 19000 else 0;
+              let followerCount : Nat = if (isOwner) 19000 else 0;
               let postCount : Nat = 0; // lightweight — no full post scan on login
               let profile : Types.UserProfile = {
                 id             = user.id;
                 username       = user.username;
-                bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
+                bio            = if (isOwner) "" else Lib.sanitizeOwnerBio(user.bio);
                 visibility     = user.visibility;
                 postCount;
                 followerCount;
@@ -256,7 +263,7 @@ mixin (
                 coverPhotoUrl   = user.coverPhotoUrl;
                 isVerified      = user.isVerified;
                 isOfficialPage  = false;
-                aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
+                aboutBio        = if (isOwner) null else user.aboutBio;
                 aboutLocation   = user.aboutLocation;
                 aboutWork       = user.aboutWork;
                 aboutEducation  = user.aboutEducation;
@@ -268,6 +275,39 @@ mixin (
               #err("Invalid username or password");
             };
           };
+        };
+      };
+    };
+  };
+
+  /// Verify that a stored session (userId) is still valid.
+  /// Returns the user profile if valid, null if not found.
+  /// Used by the frontend to restore sessions after page reload.
+  public shared query func verifySession(userId : Common.UserId) : async ?Types.UserProfile {
+    switch (users.get(userId)) {
+      case null { null };
+      case (?user) {
+        let isOwner = Lib.isReservedName(user.username);
+        let myFollowing  = switch (follows.get(userId)) { case (?s) s; case null Set.empty<Common.UserId>() };
+        let followerCount : Nat = if (isOwner) 19000 else 0;
+        ?{
+          id             = user.id;
+          username       = user.username;
+          bio            = if (isOwner) "" else Lib.sanitizeOwnerBio(user.bio);
+          visibility     = user.visibility;
+          postCount      = 0;
+          followerCount;
+          followingCount = myFollowing.size();
+          profilePhotoUrl = user.profilePhotoUrl;
+          coverPhotoUrl   = user.coverPhotoUrl;
+          isVerified      = user.isVerified;
+          isOfficialPage  = false;
+          aboutBio        = if (isOwner) null else user.aboutBio;
+          aboutLocation   = user.aboutLocation;
+          aboutWork       = user.aboutWork;
+          aboutEducation  = user.aboutEducation;
+          aboutWebsite    = user.aboutWebsite;
+          birthdate       = user.birthdate;
         };
       };
     };
@@ -334,30 +374,29 @@ mixin (
   };
 
   /// Search users by partial username match (case-insensitive).
-  /// Limited to 50 results. Uses lightweight profile projection (no post scan, no follower scan).
+  /// Limited to 20 results. Uses lightweight profile projection (no post scan, no follower scan).
   public shared query ({ caller }) func searchUsers(term : Text) : async [Types.UserProfile] {
     let lower = term.toLower();
     let results = List.empty<Types.UserProfile>();
-    let maxResults : Nat = 50;
+    let maxResults : Nat = 20;
     for ((uid, user) in users.entries()) {
-      // Early exit once we have enough results
       if (results.size() >= maxResults) return results.toArray();
       if (user.username.toLower().contains(#text lower)) {
+        let isOwner = Lib.isReservedName(user.username);
         let followingCount = switch (follows.get(uid)) { case (?s) s.size(); case null 0 };
-        // Lightweight profile — skip post count and follower set scan entirely
         results.add({
           id             = user.id;
           username       = user.username;
-          bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
+          bio            = if (isOwner) "" else Lib.sanitizeOwnerBio(user.bio);
           visibility     = user.visibility;
           postCount      = 0;
-          followerCount  = if (user.username == "Princess Narzine Bani Hashem") 19000 else 0;
+          followerCount  = if (isOwner) 19000 else 0;
           followingCount;
           profilePhotoUrl = user.profilePhotoUrl;
           coverPhotoUrl   = user.coverPhotoUrl;
           isVerified      = user.isVerified;
           isOfficialPage  = false;
-          aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
+          aboutBio        = if (isOwner) null else user.aboutBio;
           aboutLocation   = user.aboutLocation;
           aboutWork       = user.aboutWork;
           aboutEducation  = user.aboutEducation;
@@ -704,5 +743,38 @@ mixin (
       Int.compare(a.createdAt, b.createdAt);
     });
     sorted.map<Types.Message, Types.MessageView>(func(m) { Lib.toMessageView(m, caller) }).toArray();
+  };
+
+  // ─── Repost / Share to feed ────────────────────────────────────────────────
+
+  /// Share an existing post to the caller's feed (repost).
+  /// Creates a new post with isRepost=true and originalPostId pointing to the original.
+  /// comment is optional text added by the sharer.
+  public shared ({ caller }) func sharePostToFeed(originalPostId : Common.PostId, comment : Text) : async { #ok : Types.PostView; #err : Text } {
+    if (caller.isAnonymous()) return #err("Anonymous callers cannot share posts");
+    // Verify original post exists
+    let origExists = switch (posts.find(func(p : Types.Post) : Bool { p.id == originalPostId })) {
+      case (?_) true;
+      case null false;
+    };
+    if (not origExists) {
+      // Also check official page posts
+      let inOfficial = switch (officialPagePosts.find(func(p : Types.Post) : Bool { p.id == originalPostId })) {
+        case (?_) true;
+        case null false;
+      };
+      if (not inOfficial) return #err("Original post not found");
+    };
+    switch (users.get(caller)) {
+      case null { #err("User not registered") };
+      case (?user) {
+        let id  = nextPostId.value;
+        nextPostId.value += 1;
+        let now = Time.now();
+        let post = Lib.newRepost(id, user, comment, originalPostId, now);
+        posts.add(post);
+        #ok(toView(post));
+      };
+    };
   };
 };

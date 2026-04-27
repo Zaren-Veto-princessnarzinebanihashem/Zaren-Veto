@@ -1436,7 +1436,19 @@ function PostCard({
   };
 
   const handleShare = () => {
-    toast.success(t.shareToFeed);
+    if (!actor) return;
+    // Repost within Zaren Veto
+    actor
+      .sharePost(post.id)
+      .then(() => {
+        setTimeout(() => {
+          void qc.invalidateQueries({ queryKey: ["feed"] });
+        }, 0);
+        toast.success(t.shareToFeed);
+      })
+      .catch(() => {
+        toast.error(t.failedToPublishPost);
+      });
   };
 
   const reactionEmoji = currentReaction

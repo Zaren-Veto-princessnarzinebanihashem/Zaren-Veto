@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuthenticatedBackend } from "@/hooks/useAuthenticatedBackend";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useLanguage } from "@/i18n/LanguageContext";
+import type { GroupView } from "@/types";
 import { useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
@@ -21,22 +22,6 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface GroupView {
-  id: bigint;
-  name: string;
-  description: string;
-  hasCoverImage: boolean;
-  coverImageData: [] | [string];
-  isPrivate: boolean;
-  ownerId: { toText(): string };
-  ownerUsername: string;
-  memberCount: bigint;
-  isMember: boolean;
-  createdAt: bigint;
-}
 
 // ─── Cover color palette (used when no cover image) ──────────────────────────
 
@@ -148,7 +133,7 @@ function CreateGroupModal({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (group: GroupView) => void;
 }) {
   const { actor } = useAuthenticatedBackend();
   const [name, setName] = useState("");
@@ -171,38 +156,38 @@ function CreateGroupModal({
     setSubmitting(true);
     setError("");
     try {
-      // Call backend createGroup
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const backendActor = actor as any;
-      if (typeof backendActor.createGroup !== "function") {
-        throw new Error(
-          "La fonctionnalité groupes n'est pas encore disponible sur ce serveur.",
-        );
-      }
-      const result = await backendActor.createGroup(
+      const result = await actor.createGroup(
         name.trim(),
         description.trim(),
         isPrivate,
         null,
       );
-      if (
-        result &&
-        typeof result === "object" &&
-        "__kind__" in result &&
-        result.__kind__ === "err"
-      ) {
-        throw new Error(result.err as string);
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
       }
+      const newGroup = result.ok;
       setDone(true);
       toast.success(`Groupe "${name.trim()}" créé avec succès !`);
+      // Immediately notify parent with the new group so it appears instantly
+      onCreated(newGroup);
       setTimeout(() => {
-        onCreated();
         onClose();
-      }, 800);
+      }, 600);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Erreur lors de la création";
-      setError(msg);
+      if (
+        msg.includes("IC0508") ||
+        msg.includes("canister") ||
+        msg.includes("503")
+      ) {
+        setError(
+          "Service temporairement indisponible. Veuillez réessayer dans quelques secondes.",
+        );
+      } else {
+        setError(msg);
+      }
+      // Do NOT clear the form on error — keep what user typed
     } finally {
       setSubmitting(false);
     }
@@ -391,15 +376,7 @@ export default function GroupsPage() {
     setLoading(true);
     setLoadError("");
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const backendActor = actor as any;
-      if (typeof backendActor.getGroups !== "function") {
-        // Backend groups not deployed yet — show empty state gracefully
-        setGroups([]);
-        setLoading(false);
-        return;
-      }
-      const result = (await backendActor.getGroups()) as GroupView[];
+      const result = await actor.getGroups();
       setGroups(result ?? []);
     } catch {
       setLoadError("Impossible de charger les groupes.");
@@ -420,13 +397,18 @@ export default function GroupsPage() {
     if (!actor) return;
     setJoiningId(groupId);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const backendActor = actor as any;
-      if (typeof backendActor.joinGroup === "function") {
-        await backendActor.joinGroup(groupId);
-      }
-      // Reload to get fresh isMember state
-      await loadGroups();
+      const result = await actor.joinGroup(groupId);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      // Optimistically update isMember in local state
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId
+            ? { ...g, isMember: true, memberCount: g.memberCount + 1n }
+            : g,
+        ),
+      );
+      // Also trigger a background refetch after a short delay as backup
+      setTimeout(() => void loadGroups(), 500);
       toast.success("Vous avez rejoint le groupe !");
     } catch {
       toast.error("Impossible de rejoindre le groupe.");
@@ -556,7 +538,13 @@ export default function GroupsPage() {
         {showCreate && (
           <CreateGroupModal
             onClose={() => setShowCreate(false)}
-            onCreated={() => void loadGroups()}
+            onCreated={(newGroup) => {
+              // Immediately add to local state — no waiting for refetch
+              setGroups((prev) => [newGroup, ...prev]);
+              setShowCreate(false);
+              // Background refetch after 500ms as backup
+              setTimeout(() => void loadGroups(), 500);
+            }}
           />
         )}
       </AnimatePresence>

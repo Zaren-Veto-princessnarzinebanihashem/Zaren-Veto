@@ -65,6 +65,23 @@ module {
     result;
   };
 
+  // ─── Owner bio sanitization ───────────────────────────────────────────────
+
+  /// Remove any variant of "Personnalité" or "Publique" from a bio string.
+  /// This prevents duplication when the frontend hardcodes those blue lines.
+  public func sanitizeOwnerBio(bio : Text) : Text {
+    if (bio.size() == 0) return "";
+    let lower = bio.toLower();
+    // If the bio contains any of the forbidden words, return ""
+    if (lower.contains(#text "personnalité") or
+        lower.contains(#text "personnalite") or
+        lower.contains(#text "publique") or
+        lower.contains(#text "public")) {
+      return "";
+    };
+    bio;
+  };
+
   // ─── Owner name protection ────────────────────────────────────────────────
 
   /// Normalise a username for comparison: lowercase, remove spaces/hyphens/underscores/dots.
@@ -123,7 +140,8 @@ module {
   public func newUser(id : Common.UserId, username : Text, bio : Text) : Types.User {
     // Always clear bio for the owner — the frontend hardcodes the two blue lines.
     // This prevents "Personnalité Publique Publique" duplication.
-    let safeBio = if (username == "Princess Narzine Bani Hashem") "" else bio;
+    let isOwner = isReservedName(username);
+    let safeBio = if (isOwner) "" else sanitizeOwnerBio(bio);
     {
       id;
       var username;
@@ -158,7 +176,8 @@ module {
     email    : ?Text,
   ) : Types.User {
     // Always clear bio for the owner — the frontend hardcodes the two blue lines.
-    let safeBio = if (username == "Princess Narzine Bani Hashem") "" else bio;
+    let isOwner = isReservedName(username);
+    let safeBio = if (isOwner) "" else sanitizeOwnerBio(bio);
     {
       id;
       var username;
@@ -191,12 +210,13 @@ module {
     following : Set.Set<Common.UserId>,
   ) : Types.UserProfile {
     let postCount = posts.filter(func(p : Types.Post) : Bool { p.authorId == user.id }).size();
+    let ownerCheck = isReservedName(user.username);
     // Owner account always shows 19k followers
-    let followerCount = if (user.username == "Princess Narzine Bani Hashem") 19000 else followers.size();
+    let followerCount = if (ownerCheck) 19000 else followers.size();
     {
       id             = user.id;
       username       = user.username;
-      bio            = if (user.username == "Princess Narzine Bani Hashem") "" else user.bio;
+      bio            = if (ownerCheck) "" else sanitizeOwnerBio(user.bio);
       visibility     = user.visibility;
       postCount;
       followerCount;
@@ -205,7 +225,7 @@ module {
       coverPhotoUrl   = user.coverPhotoUrl;
       isVerified      = user.isVerified;
       isOfficialPage  = false;
-      aboutBio        = if (user.username == "Princess Narzine Bani Hashem") null else user.aboutBio;
+      aboutBio        = if (ownerCheck) null else user.aboutBio;
       aboutLocation   = user.aboutLocation;
       aboutWork       = user.aboutWork;
       aboutEducation  = user.aboutEducation;
@@ -237,6 +257,32 @@ module {
       var updatedAt = now;
       var isPinned  = false;
       var imageUrl;
+      var isRepost       = false;
+      var originalPostId = null;
+    };
+  };
+
+  /// Create a repost record referencing the original post.
+  public func newRepost(
+    id              : Common.PostId,
+    author          : Types.User,
+    comment         : Text,
+    origPostId      : Common.PostId,
+    now             : Common.Timestamp,
+  ) : Types.Post {
+    {
+      id;
+      authorId   = author.id;
+      authorName = author.username;
+      var content     = comment;
+      visibility      = #everyone;
+      var customAllowList = [];
+      createdAt  = now;
+      var updatedAt = now;
+      var isPinned  = false;
+      var imageUrl  = null;
+      var isRepost       = true;
+      var originalPostId = ?origPostId;
     };
   };
 
@@ -254,6 +300,8 @@ module {
       imageUrl   = post.imageUrl;
       authorVerified;
       authorProfilePhoto;
+      isRepost       = post.isRepost;
+      originalPostId = post.originalPostId;
     };
   };
 

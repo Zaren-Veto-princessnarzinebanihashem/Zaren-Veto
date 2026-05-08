@@ -38,9 +38,35 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </QueryClientProvider>,
 );
 
-// Register service worker for PWA support
+// Register service worker for PWA support with auto-update on new deployment
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(console.error);
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((registration) => {
+        // Listen for new SW versions and force-update the installed app
+        registration.addEventListener("updatefound", () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener("statechange", () => {
+            if (
+              newWorker.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              // A new version is available — tell it to skip waiting, then reload
+              newWorker.postMessage({ type: "SKIP_WAITING" });
+              // Reload once the new SW has taken control
+              navigator.serviceWorker.addEventListener(
+                "controllerchange",
+                () => {
+                  window.location.reload();
+                },
+                { once: true },
+              );
+            }
+          });
+        });
+      })
+      .catch(console.error);
   });
 }

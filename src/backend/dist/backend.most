@@ -232,78 +232,78 @@ type User__411373797 =
 type Visibility__499707805 =
   {#customList; #everyone; #followersOnly; #friendsOnly};
 actor {
-  stable blockedUsers :
+  stable var blockedUsers :
     {
       var root :
         Node__46230540<UserId__158757552, Set__532252804<UserId__158757552>>;
       var size : Nat__490723111
     };
-  stable comments :
+  stable var comments :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Comment__495386713]];
       var elementIndex : Nat__490723111
     };
-  stable followers :
+  stable var followers :
     {
       var root :
         Node__46230540<UserId__158757552, List__415060402<UserId__158757552>>;
       var size : Nat__490723111
     };
-  stable follows :
+  stable var follows :
     {
       var root :
         Node__46230540<UserId__158757552, Set__532252804<UserId__158757552>>;
       var size : Nat__490723111
     };
-  stable friendRequests :
+  stable var friendRequests :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?FriendRequest__180764053]];
       var elementIndex : Nat__490723111
     };
-  stable groupPostLikes :
+  stable var groupPostLikes :
     {
       var root :
         Node__46230540<GroupPostId__491780489,
                         List__415060402<UserId__158757552>>;
       var size : Nat__490723111
     };
-  stable groupPosts :
+  stable var groupPosts :
     {
       var root :
         Node__46230540<GroupId__724235155,
                         List__415060402<GroupPost__811872307>>;
       var size : Nat__490723111
     };
-  stable groups :
+  stable var groups :
     {
       var root : Node__46230540<GroupId__724235155, Group__533693579>;
       var size : Nat__490723111
     };
-  stable hashtagIndex :
+  stable var hashtagIndex :
     {
       var root : Node__46230540<Text, List__415060402<PostId__861309770>>;
       var size : Nat__490723111
     };
-  stable hashtagPostTime :
+  stable var hashtagPostTime :
     {
       var root : Node__46230540<Text, List__415060402<Timestamp__301639476>>;
       var size : Nat__490723111
     };
-  stable likes :
+  stable var likes :
     {
       var root :
         Node__46230540<PostId__861309770, Set__532252804<UserId__158757552>>;
       var size : Nat__490723111
     };
-  stable messages :
+  stable var messages :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Message__211416617]];
       var elementIndex : Nat__490723111
     };
-  stable msgReactions :
+  stable var msgReactions :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?MessageReaction__11955573]];
@@ -321,66 +321,66 @@ actor {
   stable nextPostId : {var value : Nat};
   stable nextReportId : {var value : Nat};
   stable nextStoryId : {var value : Nat};
-  stable notifications :
+  stable var notifications :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Notification__920622627]];
       var elementIndex : Nat__490723111
     };
-  stable officialPagePosts :
+  stable var officialPagePosts :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Post__677268252]];
       var elementIndex : Nat__490723111
     };
-  stable pageFollowers :
+  stable var pageFollowers :
     {
       var root :
         Node__46230540<PageId__238379147, Set__532252804<UserId__158757552>>;
       var size : Nat__490723111
     };
-  stable pagePosts :
+  stable var pagePosts :
     {
       var root :
         Node__46230540<PageId__238379147, List__415060402<Post__677268252>>;
       var size : Nat__490723111
     };
-  stable pages :
+  stable var pages :
     {
       var root : Node__46230540<PageId__238379147, Page__1017569416>;
       var size : Nat__490723111
     };
-  stable pinnedPosts :
+  stable var pinnedPosts :
     {
       var root : Node__46230540<UserId__158757552, PostId__861309770>;
       var size : Nat__490723111
     };
-  stable pollVotes :
+  stable var pollVotes :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?PollVote__953216253]];
       var elementIndex : Nat__490723111
     };
-  stable polls :
+  stable var polls :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Poll__1055658710]];
       var elementIndex : Nat__490723111
     };
-  stable postCommentsIndex :
+  stable var postCommentsIndex :
     {
       var root :
         Node__46230540<PostId__861309770,
                         List__415060402<CommentId__740647676>>;
       var size : Nat__490723111
     };
-  stable posts :
+  stable var posts :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Post__677268252]];
       var elementIndex : Nat__490723111
     };
-  stable reactions :
+  stable var reactions :
     {
       var root :
         Node__46230540<PostId__861309770,
@@ -388,40 +388,40 @@ actor {
                                         ReactionType__110811559>>;
       var size : Nat__490723111
     };
-  stable reports :
+  stable var reports :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Report__833543126]];
       var elementIndex : Nat__490723111
     };
-  stable savedPosts :
+  stable var savedPosts :
     {
       var root :
         Node__46230540<UserId__158757552, Set__532252804<PostId__861309770>>;
       var size : Nat__490723111
     };
-  stable shares :
+  stable var shares :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Share__777168058]];
       var elementIndex : Nat__490723111
     };
-  stable stories :
+  stable var stories :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Story__838062551]];
       var elementIndex : Nat__490723111
     };
-  stable usernameIndex :
+  stable var usernameIndex :
     {
       var root : Node__46230540<Text, UserId__158757552>;
       var size : Nat__490723111
     };
-  stable users :
+  stable var users :
     {
       var root : Node__46230540<UserId__158757552, User__411373797>;
       var size : Nat__490723111
     };
-  stable verified :
+  stable var verified :
     {var root : Node__92254746<UserId__158757552>; var size : Nat__490723111}
 };

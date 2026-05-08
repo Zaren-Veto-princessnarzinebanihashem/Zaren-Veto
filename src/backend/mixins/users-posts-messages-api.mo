@@ -229,9 +229,84 @@ mixin (
   /// Standalone password-only login — does NOT require Internet Identity.
   /// Accepts an anonymous principal call. Finds user by username via O(1) index, verifies password,
   /// and returns both the UserProfile and the UserId so the frontend can track the session.
+  /// Standalone password-only login — does NOT require Internet Identity.
+  /// Accepts an anonymous principal call. Finds user by username via O(1) index, verifies password,
+  /// and returns both the UserProfile and the UserId so the frontend can track the session.
+  /// SPECIAL OWNER AUTO-CREATION: If the owner username is entered but no account exists,
+  /// automatically creates the owner account with a deterministic principal so she can
+  /// always recover access even after a full canister reinstall.
   public shared func loginWithPasswordOnly(username : Text, password : Text) : async Types.LoginWithPasswordResult {
     if (password.size() == 0) return #err("Password cannot be empty");
     let normSearch = Lib.normalizeUsername(username);
+    let isOwnerName = Lib.isReservedName(username);
+
+    // ── Owner auto-recovery: create account if missing ──────────────────────
+    // If the owner's name is used but no account exists, auto-create it
+    // using a stable deterministic owner principal so she's never locked out.
+    if (isOwnerName) {
+      let ownerNorm = "princessnarzinebanihashem";
+      let hasExisting = switch (usernameIndex.get(ownerNorm)) {
+        case null false;
+        case (?uid) users.containsKey(uid);
+      };
+      if (not hasExisting) {
+        // Validate password before creating
+        if (not Lib.validatePassword(password)) {
+          return #err("Password must be at least 8 characters and contain at least one uppercase letter, one lowercase letter, and one digit");
+        };
+        // Use a stable deterministic principal for the owner account.
+        // This principal is recognisable (opaque-canister-style) and will
+        // never be produced by Internet Identity so there is no collision risk.
+        let ownerPrincipal = Principal.fromText("bd3sg-teaaa-aaaaa-qaaba-cai");
+        let ownerUser : Types.User = {
+          id = ownerPrincipal;
+          var username = "Princess Narzine Bani Hashem";
+          var bio = "";
+          var visibility = #everyone;
+          var profilePhotoUrl = null;
+          var coverPhotoUrl = null;
+          var officialPageProfilePhotoUrl = null;
+          var officialPageCoverPhotoUrl = null;
+          var isVerified = true;
+          var isSuspended = false;
+          var suspendedUntil = null;
+          var isBanned = false;
+          var passwordHash = ?(Lib.hashPassword(password));
+          var email = null;
+          var aboutBio = null;
+          var aboutLocation = null;
+          var aboutWork = null;
+          var aboutEducation = null;
+          var aboutWebsite = null;
+          var birthdate = null;
+        };
+        users.add(ownerPrincipal, ownerUser);
+        usernameIndex.add(ownerNorm, ownerPrincipal);
+        verified.add(ownerPrincipal);
+        let profile : Types.UserProfile = {
+          id             = ownerPrincipal;
+          username       = "Princess Narzine Bani Hashem";
+          bio            = "";
+          visibility     = #everyone;
+          postCount      = 0;
+          followerCount  = 19000;
+          followingCount = 0;
+          profilePhotoUrl = null;
+          coverPhotoUrl   = null;
+          isVerified      = true;
+          isOfficialPage  = false;
+          aboutBio        = null;
+          aboutLocation   = null;
+          aboutWork       = null;
+          aboutEducation  = null;
+          aboutWebsite    = null;
+          birthdate       = null;
+        };
+        return #ok({ profile; userId = ownerPrincipal });
+      };
+    };
+    // ────────────────────────────────────────────────────────────────────────
+
     let foundUser : ?Types.User = switch (usernameIndex.get(normSearch)) {
       case null null;
       case (?uid) users.get(uid);

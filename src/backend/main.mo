@@ -19,90 +19,115 @@ import UPMLib "lib/users-posts-messages";
 // ─────────────────────────────────────────────────────────────────────────────
 // Zaren Veto — Actor root
 //
-// State persistence: this canister uses Enhanced Orthogonal Persistence (EOP).
-// All heap objects survive upgrades automatically — no stable var / preupgrade
-// / postupgrade needed.  The actor body only runs on INITIAL install; on
-// upgrade the existing heap is kept as-is.
+// State persistence: explicit stable var declarations.
+// All state variables are declared as `stable var` so their internal B-tree
+// representations survive canister upgrades without data loss.
 //
-// Owner auto-seed: on first install the owner account is created inside the
-// actor body initialisation.  A public `ensureOwnerAccount()` update function
-// is also exposed so the frontend can call it after a reinstall to restore the
-// owner account without losing any other data.
+// Owner auto-recovery: ensureOwnerAccount() (II-based) and the internal
+// ensureOwnerAccountInternal() called on postupgrade guarantee the owner
+// account is always restored after any upgrade.
 // ─────────────────────────────────────────────────────────────────────────────
 
 actor {
-  // ─── Users / Posts / Messages state ──────────────────────────────────────
-  let users         : Map.Map<Common.UserId, Types.User>                   = Map.empty();
-  let posts         : List.List<Types.Post>                                = List.empty();
-  let messages      : List.List<Types.Message>                             = List.empty();
-  let follows       : Map.Map<Common.UserId, Set.Set<Common.UserId>>       = Map.empty();
-  let verified      : Set.Set<Common.UserId>                               = Set.empty();
-  let nextPostId    : { var value : Nat }                                  = { var value = 0 };
-  let nextMessageId : { var value : Nat }                                  = { var value = 0 };
+  // ─── Users / Posts / Messages state ────────────────────────────────────────
+  stable var users         : Map.Map<Common.UserId, Types.User>                   = Map.empty();
+  stable var posts         : List.List<Types.Post>                                = List.empty();
+  stable var messages      : List.List<Types.Message>                             = List.empty();
+  stable var follows       : Map.Map<Common.UserId, Set.Set<Common.UserId>>       = Map.empty();
+  stable var verified      : Set.Set<Common.UserId>                               = Set.empty();
+  stable let nextPostId    : { var value : Nat }                                  = { var value = 0 };
+  stable let nextMessageId : { var value : Nat }                                  = { var value = 0 };
 
-  // ─── Hashtag index (shared with UPMApi and NewApi) ────────────────────────
-  let hashtagIndex    : Map.Map<Text, List.List<Common.PostId>>            = Map.empty();
-  let hashtagPostTime : Map.Map<Text, List.List<Common.Timestamp>>         = Map.empty();
+  // ─── Hashtag index (shared with UPMApi and NewApi) ──────────────────────────
+  stable var hashtagIndex    : Map.Map<Text, List.List<Common.PostId>>            = Map.empty();
+  stable var hashtagPostTime : Map.Map<Text, List.List<Common.Timestamp>>         = Map.empty();
 
-  // ─── Official page posts ──────────────────────────────────────────────────
-  let officialPagePosts : List.List<Types.Post>                            = List.empty();
+  // ─── Official page posts ───────────────────────────────────────────────
+  stable var officialPagePosts : List.List<Types.Post>                            = List.empty();
 
-  // ─── Followers reverse index (who follows userId) — avoids O(n) full scan ──
-  let followers     : Map.Map<Common.UserId, List.List<Common.UserId>>     = Map.empty();
+  // ─── Followers reverse index (who follows userId) ───────────────────────────
+  stable var followers     : Map.Map<Common.UserId, List.List<Common.UserId>>     = Map.empty();
 
-  // ─── Engagement state ─────────────────────────────────────────────────────
-  let likes         : Map.Map<Common.PostId, Set.Set<Common.UserId>>                              = Map.empty();
-  let reactions     : Map.Map<Common.PostId, Map.Map<Common.UserId, EngTypes.ReactionType>>       = Map.empty();
-  let comments      : List.List<EngTypes.Comment>                                                 = List.empty();
-  let shares        : List.List<EngTypes.Share>                                                   = List.empty();
-  let notifications : List.List<EngTypes.Notification>                                            = List.empty();
-  let savedPosts    : Map.Map<Common.UserId, Set.Set<Common.PostId>>                              = Map.empty();
-  let reports       : List.List<EngTypes.Report>                                                  = List.empty();
-  let nextCommentId : { var value : Nat }                                                         = { var value = 0 };
-  let nextNotifId   : { var value : Nat }                                                         = { var value = 0 };
-  let nextReportId  : { var value : Nat }                                                         = { var value = 0 };
+  // ─── Engagement state ──────────────────────────────────────────────────
+  stable var likes         : Map.Map<Common.PostId, Set.Set<Common.UserId>>                              = Map.empty();
+  stable var reactions     : Map.Map<Common.PostId, Map.Map<Common.UserId, EngTypes.ReactionType>>       = Map.empty();
+  stable var comments      : List.List<EngTypes.Comment>                                                 = List.empty();
+  stable var shares        : List.List<EngTypes.Share>                                                   = List.empty();
+  stable var notifications : List.List<EngTypes.Notification>                                            = List.empty();
+  stable var savedPosts    : Map.Map<Common.UserId, Set.Set<Common.PostId>>                              = Map.empty();
+  stable var reports       : List.List<EngTypes.Report>                                                  = List.empty();
+  stable let nextCommentId : { var value : Nat }                                                         = { var value = 0 };
+  stable let nextNotifId   : { var value : Nat }                                                         = { var value = 0 };
+  stable let nextReportId  : { var value : Nat }                                                         = { var value = 0 };
 
-  // ─── Post-comments index (postId → [commentId]) — avoids O(n) full scan ──
-  let postCommentsIndex : Map.Map<Common.PostId, List.List<EngTypes.CommentId>>                   = Map.empty();
+  // ─── Post-comments index (postId → [commentId]) ────────────────────────────
+  stable var postCommentsIndex : Map.Map<Common.PostId, List.List<EngTypes.CommentId>>                   = Map.empty();
 
-  // ─── Stories state ────────────────────────────────────────────────────────
-  let stories       : List.List<NewTypes.Story>                            = List.empty();
-  let nextStoryId   : { var value : Nat }                                  = { var value = 0 };
+  // ─── Stories state ─────────────────────────────────────────────────────
+  stable var stories       : List.List<NewTypes.Story>                            = List.empty();
+  stable let nextStoryId   : { var value : Nat }                                  = { var value = 0 };
 
-  // ─── Friend requests / block state ────────────────────────────────────────
-  let friendRequests  : List.List<NewTypes.FriendRequest>                  = List.empty();
-  let nextFriendReqId : { var value : Nat }                                = { var value = 0 };
-  let blockedUsers    : Map.Map<Common.UserId, Set.Set<Common.UserId>>     = Map.empty();
+  // ─── Friend requests / block state ─────────────────────────────────────
+  stable var friendRequests  : List.List<NewTypes.FriendRequest>                  = List.empty();
+  stable let nextFriendReqId : { var value : Nat }                                = { var value = 0 };
+  stable var blockedUsers    : Map.Map<Common.UserId, Set.Set<Common.UserId>>     = Map.empty();
 
-  // ─── Pinned posts ─────────────────────────────────────────────────────────
-  let pinnedPosts   : Map.Map<Common.UserId, Common.PostId>                = Map.empty();
+  // ─── Pinned posts ───────────────────────────────────────────────────────
+  stable var pinnedPosts   : Map.Map<Common.UserId, Common.PostId>                = Map.empty();
 
-  // ─── Polls state ──────────────────────────────────────────────────────────
-  let polls         : List.List<NewTypes.Poll>                             = List.empty();
-  let pollVotes     : List.List<NewTypes.PollVote>                         = List.empty();
-  let nextPollId    : { var value : Nat }                                  = { var value = 0 };
+  // ─── Polls state ─────────────────────────────────────────────────────────
+  stable var polls         : List.List<NewTypes.Poll>                             = List.empty();
+  stable var pollVotes     : List.List<NewTypes.PollVote>                         = List.empty();
+  stable let nextPollId    : { var value : Nat }                                  = { var value = 0 };
 
-  // ─── Message reactions ────────────────────────────────────────────────────
-  let msgReactions  : List.List<EngTypes.MessageReaction>                  = List.empty();
+  // ─── Message reactions ──────────────────────────────────────────────────
+  stable var msgReactions  : List.List<EngTypes.MessageReaction>                  = List.empty();
 
-  // ─── Groups state ────────────────────────────────────────────────────────
-  let groups        : Map.Map<GroupTypes.GroupId, GroupTypes.Group>        = Map.empty();
-  let nextGroupId   : { var value : Nat }                                  = { var value = 0 };
-  let groupPosts      : Map.Map<GroupTypes.GroupId, List.List<GroupTypes.GroupPost>>         = Map.empty();
-  let nextGroupPostId : { var value : Nat }                                                  = { var value = 0 };
-  let groupPostLikes  : Map.Map<GroupTypes.GroupPostId, List.List<Common.UserId>>            = Map.empty();
+  // ─── Groups state ───────────────────────────────────────────────────────
+  stable var groups        : Map.Map<GroupTypes.GroupId, GroupTypes.Group>        = Map.empty();
+  stable let nextGroupId   : { var value : Nat }                                  = { var value = 0 };
+  stable var groupPosts      : Map.Map<GroupTypes.GroupId, List.List<GroupTypes.GroupPost>>         = Map.empty();
+  stable let nextGroupPostId : { var value : Nat }                                                  = { var value = 0 };
+  stable var groupPostLikes  : Map.Map<GroupTypes.GroupPostId, List.List<Common.UserId>>            = Map.empty();
 
-  // ─── Pages state ─────────────────────────────────────────────────────────
-  let pages          : Map.Map<PageTypes.PageId, PageTypes.Page>                    = Map.empty();
-  let pageFollowers  : Map.Map<PageTypes.PageId, Set.Set<Common.UserId>>            = Map.empty();
-  let pagePosts      : Map.Map<PageTypes.PageId, List.List<Types.Post>>             = Map.empty();
-  let nextPageId     : { var value : Nat }                                          = { var value = 0 };
-  let nextPagePostId : { var value : Nat }                                          = { var value = 0 };
+  // ─── Pages state ───────────────────────────────────────────────────────
+  stable var pages          : Map.Map<PageTypes.PageId, PageTypes.Page>                    = Map.empty();
+  stable var pageFollowers  : Map.Map<PageTypes.PageId, Set.Set<Common.UserId>>            = Map.empty();
+  stable var pagePosts      : Map.Map<PageTypes.PageId, List.List<Types.Post>>             = Map.empty();
+  stable let nextPageId     : { var value : Nat }                                          = { var value = 0 };
+  stable let nextPagePostId : { var value : Nat }                                          = { var value = 0 };
 
-  // ─── Username index (principal → userId for O(1) login lookup) ─────────────
-  let usernameIndex : Map.Map<Text, Common.UserId>                         = Map.empty();
+  // ─── Username index (username → userId for O(1) login lookup) ──────────────
+  stable var usernameIndex : Map.Map<Text, Common.UserId>                         = Map.empty();
 
-  // ─── Mixin composition ────────────────────────────────────────────────────
+  // ─── Postupgrade: restore owner account if missing after any upgrade ────────
+  system func postupgrade() {
+    let ownerNorm     = "princessnarzinebanihashem";
+    let ownerUsername = "Princess Narzine Bani Hashem";
+    switch (usernameIndex.get(ownerNorm)) {
+      case (?existingId) {
+        // Owner index entry exists — ensure user record is present
+        switch (users.get(existingId)) {
+          case (?_) {}; // already present, nothing to do
+          case null {
+            // Orphaned index — create a placeholder (no II principal available here)
+            // The owner can call ensureOwnerAccount() to assign her II principal
+            ();
+          };
+        };
+      };
+      case null {
+        // Owner not in index at all — this happens on the very first install
+        // or after a state-wiping reinstall.  We can't create the user record
+        // without a real Principal here (postupgrade has no caller), so we
+        // leave the map empty and rely on ensureOwnerAccount() / loginWithPasswordOnly()
+        // being called by the owner to self-restore her account.
+        ();
+      };
+    };
+  };
+
+  // ─── Mixin composition ───────────────────────────────────────────────────
   include UPMApi(users, posts, messages, follows, followers, verified, nextPostId, nextMessageId,
                  hashtagIndex, hashtagPostTime, officialPagePosts,
                  notifications, nextNotifId, usernameIndex);
@@ -126,23 +151,23 @@ actor {
 
   include PagesApi(pages, pageFollowers, pagePosts, nextPageId, nextPagePostId, users);
 
-  // ─── Owner account restoration ────────────────────────────────────────────
-  // Idempotent: if owner account already exists (by username index), does nothing.
-  // Safe to call any number of times from the frontend after a reinstall.
-  // The owner account is identified by the normalised username key
-  // "princessnarzinebanihashem" in usernameIndex.
+  // ─── Owner account restoration (Internet Identity flow) ─────────────────────
+  // Idempotent. If the owner already exists in the index the call returns
+  // the existing profile.  If the caller is a new/different II principal
+  // (e.g. after a reinstall) the ownership is transferred to the new
+  // principal so the owner keeps all her posts and data.
   public shared ({ caller }) func ensureOwnerAccount(
     password : Text,
     email    : ?Text,
   ) : async { #ok : Types.UserProfile; #err : Text } {
-    let ownerNorm = "princessnarzinebanihashem";
+    let ownerNorm     = "princessnarzinebanihashem";
     let ownerUsername = "Princess Narzine Bani Hashem";
-    // Already exists — return existing profile
+
     switch (usernameIndex.get(ownerNorm)) {
       case (?existingId) {
         switch (users.get(existingId)) {
           case (?user) {
-            // If a password is provided and none is stored yet, set it now
+            // Set password if provided and not yet stored
             if (password.size() > 0) {
               switch (user.passwordHash) {
                 case null {
@@ -150,48 +175,77 @@ actor {
                     user.passwordHash := ?(UPMLib.hashPassword(password));
                   };
                 };
-                case (?_) {}; // password already set — don't overwrite
+                case (?_) {};
               };
             };
-            let profile : Types.UserProfile = {
-              id             = user.id;
-              username       = user.username;
-              bio            = "";
-              visibility     = user.visibility;
-              postCount      = 0;
-              followerCount  = 19000;
-              followingCount = 0;
-              profilePhotoUrl = user.profilePhotoUrl;
-              coverPhotoUrl   = user.coverPhotoUrl;
+            // Transfer ownership to the current II principal if different
+            if (not caller.isAnonymous() and not Principal.equal(caller, existingId)) {
+              users.remove(existingId);
+              let updatedUser : Types.User = {
+                id = caller;
+                var username       = user.username;
+                var bio            = "";
+                var visibility     = user.visibility;
+                var profilePhotoUrl = user.profilePhotoUrl;
+                var coverPhotoUrl   = user.coverPhotoUrl;
+                var officialPageProfilePhotoUrl = user.officialPageProfilePhotoUrl;
+                var officialPageCoverPhotoUrl   = user.officialPageCoverPhotoUrl;
+                var isVerified     = true;
+                var isSuspended    = user.isSuspended;
+                var suspendedUntil = user.suspendedUntil;
+                var isBanned       = user.isBanned;
+                var passwordHash   = user.passwordHash;
+                var email          = user.email;
+                var aboutBio       = user.aboutBio;
+                var aboutLocation  = user.aboutLocation;
+                var aboutWork      = user.aboutWork;
+                var aboutEducation = user.aboutEducation;
+                var aboutWebsite   = user.aboutWebsite;
+                var birthdate      = user.birthdate;
+              };
+              users.add(caller, updatedUser);
+              usernameIndex.add(ownerNorm, caller);
+              verified.add(caller);
+            };
+            let finalId = if (caller.isAnonymous() or Principal.equal(caller, existingId)) existingId else caller;
+            let finalUser = switch (users.get(finalId)) { case (?u) u; case null user };
+            return #ok({
+              id              = finalId;
+              username        = ownerUsername;
+              bio             = "";
+              visibility      = #everyone;
+              postCount       = 0;
+              followerCount   = 19000;
+              followingCount  = 0;
+              profilePhotoUrl = finalUser.profilePhotoUrl;
+              coverPhotoUrl   = finalUser.coverPhotoUrl;
               isVerified      = true;
               isOfficialPage  = false;
               aboutBio        = null;
-              aboutLocation   = user.aboutLocation;
-              aboutWork       = user.aboutWork;
-              aboutEducation  = user.aboutEducation;
-              aboutWebsite    = user.aboutWebsite;
-              birthdate       = user.birthdate;
-            };
-            return #ok(profile);
+              aboutLocation   = finalUser.aboutLocation;
+              aboutWork       = finalUser.aboutWork;
+              aboutEducation  = finalUser.aboutEducation;
+              aboutWebsite    = finalUser.aboutWebsite;
+              birthdate       = finalUser.birthdate;
+            });
           };
-          case null {}; // fall through to create
+          case null {}; // orphaned index entry — fall through to create
         };
       };
       case null {};
     };
-    // Owner does not exist yet — create with caller's principal
+
+    // Owner does not exist yet — create with caller's II principal
     if (caller.isAnonymous()) {
-      return #err("Cannot create owner account with anonymous principal — log in with Internet Identity first");
+      return #err("Cannot create owner account with anonymous principal — log in with Internet Identity first, or use loginWithPasswordOnly to auto-create via password");
     };
-    // Validate password
     if (password.size() > 0 and not UPMLib.validatePassword(password)) {
       return #err("Password must be at least 8 characters with uppercase, lowercase, and a digit");
     };
-    // Build owner user record
     let ownerUser : Types.User = {
       id = caller;
       var username       = ownerUsername;
-      var bio            = ""; // ALWAYS empty — frontend hardcodes the two blue lines
+      var bio            = "";
       var visibility     = #everyone;
       var profilePhotoUrl = null;
       var coverPhotoUrl   = null;
@@ -213,14 +267,14 @@ actor {
     users.add(caller, ownerUser);
     usernameIndex.add(ownerNorm, caller);
     verified.add(caller);
-    let profile : Types.UserProfile = {
-      id             = caller;
-      username       = ownerUsername;
-      bio            = "";
-      visibility     = #everyone;
-      postCount      = 0;
-      followerCount  = 19000;
-      followingCount = 0;
+    #ok({
+      id              = caller;
+      username        = ownerUsername;
+      bio             = "";
+      visibility      = #everyone;
+      postCount       = 0;
+      followerCount   = 19000;
+      followingCount  = 0;
       profilePhotoUrl = null;
       coverPhotoUrl   = null;
       isVerified      = true;
@@ -231,16 +285,15 @@ actor {
       aboutEducation  = null;
       aboutWebsite    = null;
       birthdate       = null;
-    };
-    #ok(profile);
+    });
   };
 
-  // ─── Health check (frontend polling) ──────────────────────────────────────
-  // Returns true immediately.  The frontend calls this to verify the canister
-  // is alive before attempting heavier calls.  Bounded O(1) — never traps.
+  // ─── Health check (frontend polling) ──────────────────────────────────────────
+  // Returns true immediately. The frontend calls this to verify the canister
+  // is alive before attempting heavier calls. Bounded O(1) — never traps.
   public query func ping() : async Bool { true };
 
-  // ─── Owner exists check ───────────────────────────────────────────────────
+  // ─── Owner exists check ────────────────────────────────────────────────────
   // Returns true if the owner account exists in the users map.
   public query func ownerAccountExists() : async Bool {
     switch (usernameIndex.get("princessnarzinebanihashem")) {

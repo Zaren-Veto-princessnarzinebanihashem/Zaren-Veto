@@ -1,5 +1,6 @@
 // Zaren Veto Service Worker — PWA offline support
-const CACHE_VERSION = 'v1';
+// IMPORTANT: Bump CACHE_VERSION on EVERY deployment to force cache invalidation
+const CACHE_VERSION = 'zv-v40';
 const CACHE_NAME = `zaren-veto-${CACHE_VERSION}`;
 const STATIC_CACHE_NAME = `zaren-veto-static-${CACHE_VERSION}`;
 
@@ -11,7 +12,7 @@ const APP_SHELL = [
   '/favicon.ico',
 ];
 
-// Install — cache app shell
+// Install — cache app shell and skip waiting immediately so new SW activates fast
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE_NAME).then((cache) => {
@@ -23,7 +24,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate — purge old caches
+// Activate — delete ALL old caches with different version prefix
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -34,6 +35,13 @@ self.addEventListener('activate', (event) => {
       )
     ).then(() => self.clients.claim())
   );
+});
+
+// Message — allow app to trigger skipWaiting for instant update
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Fetch — cache-first for static, network-first for API calls
